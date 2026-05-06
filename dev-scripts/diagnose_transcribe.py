@@ -1,7 +1,7 @@
 """Quick diagnostic for the Azure transcribe deployment.
 
 Run from the repo root:
-    python diagnose_transcribe.py
+    python dev-scripts/diagnose_transcribe.py
 
 Reads AZURE_OPENAI_API_KEY from .env or environment, then sends a tiny
 synthetic WAV file to the transcribe endpoint to confirm:
