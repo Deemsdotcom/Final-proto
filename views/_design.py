@@ -206,10 +206,16 @@ _GLOBAL_CSS = f"""
     flex: 1 !important;
     padding: 1.5rem !important;
 }}
-/* Button pinned to the bottom of its card */
-.stApp [data-testid="stVerticalBlockBorderWrapper"] .stButton {{
+/* Push the last child of a card body (typically the button) to the
+   bottom. We target the stElementContainer (the actual flex item) rather
+   than .stButton (which is the inner element and not part of the flex
+   layout). The selector also handles cases where the last child is a
+   form or another widget container — anything that ends up last in the
+   card gets aligned to the bottom of the card body. */
+.stApp [data-testid="stVerticalBlockBorderWrapper"]
+  > div[data-testid="stVerticalBlock"]
+  > [data-testid="stElementContainer"]:last-child {{
     margin-top: auto !important;
-    padding-top: 1rem;
 }}
 /* Eyebrow label inside the card */
 .cap-card-eyebrow {{
@@ -389,10 +395,8 @@ _GLOBAL_CSS = f"""
     display: flex !important;
     flex-direction: column !important;
 }}
-/* Description markdown grows to fill available space → button naturally at bottom */
-.stApp [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdown"] {{
-    flex: 1 !important;
-}}
+/* (No per-markdown flex rule needed — the last-child margin-top:auto
+   above takes care of bottom-aligning the CTA in action cards.) */
 </style>
 """
 
