@@ -81,47 +81,47 @@ def _layer_overview() -> None:
     with col1:
         with ui.card("Themes you'll complete"):
             ui.numbered_rule(
-                1,
-                "Logical Reasoning — abstract 3×3 matrix puzzles. Pick the figure that completes the pattern.",
+                1, "Logical Reasoning — abstract 3×3 matrix puzzles. Pick the figure that completes the pattern.",
                 severity="info",
             )
             ui.numbered_rule(
-                2,
-                "Numerical Reasoning — short charts and tables, then a multiple-choice question about the data.",
+                2, "Numerical Reasoning — short charts and tables, then a multiple-choice question about the data.",
                 severity="info",
             )
             ui.numbered_rule(
-                3,
-                "Verbal Reasoning — a short passage and a statement. Decide True, False, or Cannot Say from the passage alone.",
+                3, "Verbal Reasoning — a short passage with a statement. Decide True, False, or Cannot Say.",
+                severity="info",
+            )
+            ui.numbered_rule(
+                4, f"{QUESTIONS_PER_THEME} questions per theme, each with its own per-question time limit.",
+                severity="info",
+            )
+            ui.numbered_rule(
+                5, "Themes are presented in fixed order — you cannot return to a previous theme.",
                 severity="info",
             )
 
     with col2:
         with ui.card("Before you begin"):
             ui.numbered_rule(
-                1,
-                "Pen and paper for working through problems.",
+                1, "Pen and paper for working through problems.",
                 severity="info",
             )
             ui.numbered_rule(
-                2,
-                "A calculator — the numerical theme uses percentages, ratios, and multi-step figures.",
+                2, "A calculator — the numerical theme uses percentages, ratios, and multi-step figures.",
                 severity="info",
             )
             ui.numbered_rule(
-                3,
-                "A quiet, uninterrupted environment for the next ~30 minutes.",
+                3, "A quiet, uninterrupted environment for the next ~30 minutes.",
                 severity="info",
             )
             ui.numbered_rule(
-                4,
-                f"Each theme has {QUESTIONS_PER_THEME} questions with its own per-question timer.",
-                severity="warn",
+                4, "A stable internet connection — your answers save automatically as you go.",
+                severity="info",
             )
             ui.numbered_rule(
-                5,
-                "You cannot revisit a question once answered, and time-outs count as incorrect.",
-                severity="crit",
+                5, "Time-outs count as incorrect, and answered questions cannot be revisited.",
+                severity="info",
             )
 
     st.markdown("<div style='height:1.25rem'></div>", unsafe_allow_html=True)
