@@ -345,6 +345,36 @@ _GLOBAL_CSS = f"""
 .stApp [data-testid="stToolbar"] {{ visibility: hidden; height: 0; }}
 .stApp footer {{ visibility: hidden; }}
 .stApp #MainMenu {{ visibility: hidden; }}
+
+/* ── Equal-height columns: stretch both cards, pin button to bottom ──────── */
+/* 1. Make the row stretch columns to equal height */
+.stApp [data-testid="stHorizontalBlock"] {{
+    align-items: stretch !important;
+    gap: 1.5rem;
+}}
+/* 2. Each column is a flex column so it fills the row height */
+.stApp [data-testid="stColumn"] {{
+    display: flex !important;
+    flex-direction: column !important;
+}}
+/* 3. Streamlit injects one wrapper div inside the column — flex it too */
+.stApp [data-testid="stColumn"] > div {{
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}}
+/* 4. The card itself must grow to fill the column */
+.stApp .cap-card {{
+    flex: 1 !important;
+    display: flex;
+    flex-direction: column;
+}}
+/* 5. Button wrapper is pushed to the bottom via auto top margin */
+.stApp .cap-card .stButton,
+.stApp .cap-card [data-testid="stButton"] {{
+    margin-top: auto;
+    padding-top: 1rem;
+}}
 </style>
 """
 
