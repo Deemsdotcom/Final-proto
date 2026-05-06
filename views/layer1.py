@@ -24,6 +24,7 @@ from assessment_logic.layer1_logic import (
 )
 from database import db
 
+from . import _design as ui
 from .state import advance_stage
 
 
@@ -64,36 +65,77 @@ def render() -> None:
 
 def _layer_overview() -> None:
     """Layer 1 overview shown once before the first theme intro."""
-    st.title("Layer 1 — Cognitive Assessment")
-    st.markdown(
-        f"""
-        Layer 1 has three themes you'll work through in order:
+    ui.inject_global_styles()
+    ui.header()
 
-        1. **Logical Reasoning** — abstract matrix puzzles. You'll see a 3×3
-           grid of figures with one cell missing, and pick the figure that
-           completes the pattern.
-        2. **Numerical Reasoning** — short charts and tables, followed by a
-           multiple-choice question about the data.
-        3. **Verbal Reasoning** — a short passage followed by a statement.
-           You decide whether the statement is **True**, **False**, or
-           **Cannot Say** based only on the passage.
-
-        Each theme has **{QUESTIONS_PER_THEME} questions** with its own
-        per-question time limit. If time expires on a question, it's marked
-        incorrect and you move on automatically. You cannot revisit
-        questions once answered.
-
-        ### Before you begin — please make sure you have:
-        - 📝 **Pen and paper** for working through problems
-        - 🧮 **A calculator** (the numerical theme requires arithmetic on
-          percentages, ratios, and multi-step figures)
-        - 🪑 A quiet, uninterrupted environment for the next ~30 minutes
-
-        Pick the best answer; you will not see whether you got each
-        question right.
-        """
+    ui.eyebrow("Stage 1 of 3 · Cognitive Assessment")
+    ui.page_title(
+        "Cognitive Assessment",
+        "Three timed reasoning themes. Read the rules carefully before you begin.",
     )
-    if st.button("Continue to Logical Reasoning", type="primary"):
+
+    import streamlit as st  # local alias for clarity
+
+    col1, col2 = st.columns(2, gap="large")
+
+    with col1:
+        with ui.card("Themes you'll complete"):
+            ui.numbered_rule(
+                1,
+                "Logical Reasoning — abstract 3×3 matrix puzzles. Pick the figure that completes the pattern.",
+                severity="info",
+            )
+            ui.numbered_rule(
+                2,
+                "Numerical Reasoning — short charts and tables, then a multiple-choice question about the data.",
+                severity="info",
+            )
+            ui.numbered_rule(
+                3,
+                "Verbal Reasoning — a short passage and a statement. Decide True, False, or Cannot Say from the passage alone.",
+                severity="info",
+            )
+
+    with col2:
+        with ui.card("Before you begin"):
+            ui.numbered_rule(
+                1,
+                "Pen and paper for working through problems.",
+                severity="info",
+            )
+            ui.numbered_rule(
+                2,
+                "A calculator — the numerical theme uses percentages, ratios, and multi-step figures.",
+                severity="info",
+            )
+            ui.numbered_rule(
+                3,
+                "A quiet, uninterrupted environment for the next ~30 minutes.",
+                severity="info",
+            )
+            ui.numbered_rule(
+                4,
+                f"Each theme has {QUESTIONS_PER_THEME} questions with its own per-question timer.",
+                severity="warn",
+            )
+            ui.numbered_rule(
+                5,
+                "You cannot revisit a question once answered, and time-outs count as incorrect.",
+                severity="crit",
+            )
+
+    st.markdown("<div style='height:1.25rem'></div>", unsafe_allow_html=True)
+    ui.info_banner(
+        "Pick the best answer for each question — you will not see whether you got each one right.",
+        icon="ℹ",
+    )
+
+    if st.button(
+        "Continue to Logical Reasoning",
+        type="primary",
+        use_container_width=True,
+        key="l1_overview_continue",
+    ):
         st.session_state.l1_overview_seen = True
         st.rerun()
 
