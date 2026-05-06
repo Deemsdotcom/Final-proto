@@ -22,12 +22,17 @@ DB_PATH = Path(__file__).parent.parent / "recruitment.db"
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
-def _get_recruiter_password() -> str:
+def get_recruiter_password() -> str:
     """Read recruiter password from Streamlit secrets, then env, then fallback.
 
     Streamlit secrets are checked first so production deployments use the
     configured password. Falls back to the env var, then a local-dev default
     so the app still runs without any config (with a weak password).
+
+    Always call this at the point of use, not at module import time. On
+    Streamlit Cloud, st.secrets is not always populated when this module
+    is first imported; caching the result at import would silently fall
+    back to the local-dev default.
     """
     try:
         import streamlit as st
@@ -38,8 +43,11 @@ def _get_recruiter_password() -> str:
     return os.getenv("RECRUITER_PASSWORD", "changeme-local-dev")
 
 
+# Backwards-compatible private alias. Prefer the public name above.
+_get_recruiter_password = get_recruiter_password
+
+
 DEFAULT_RECRUITER_USERNAME = "recruiter"
-DEFAULT_RECRUITER_PASSWORD = _get_recruiter_password()
 
 
 def _hash_password(password: str) -> str:
@@ -113,6 +121,7 @@ def init_db() -> bool:
     if the recruiter row was freshly created (not just synced).
     """
     freshly_seeded = False
+    configured_password = _get_recruiter_password()
     with get_conn() as conn:
         with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
             conn.executescript(f.read())
@@ -125,7 +134,7 @@ def init_db() -> bool:
         if row is None:
             conn.execute(
                 "INSERT INTO recruiter_auth (username, password_hash) VALUES (?, ?)",
-                (DEFAULT_RECRUITER_USERNAME, _hash_password(DEFAULT_RECRUITER_PASSWORD)),
+                (DEFAULT_RECRUITER_USERNAME, _hash_password(configured_password)),
             )
             freshly_seeded = True
         else:
@@ -137,12 +146,12 @@ def init_db() -> bool:
             #   - If it doesn't match, the secret has rotated (or the stored
             #     hash was for a different password) — re-hash and store.
             stored = row["password_hash"]
-            currently_valid = _verify_password(DEFAULT_RECRUITER_PASSWORD, stored)
+            currently_valid = _verify_password(configured_password, stored)
             is_legacy = bool(stored) and not stored.startswith("$2")
             if not currently_valid or is_legacy:
                 conn.execute(
                     "UPDATE recruiter_auth SET password_hash = ? WHERE username = ?",
-                    (_hash_password(DEFAULT_RECRUITER_PASSWORD), DEFAULT_RECRUITER_USERNAME),
+                    (_hash_password(configured_password), DEFAULT_RECRUITER_USERNAME),
                 )
     return freshly_seeded
 

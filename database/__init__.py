@@ -19,5 +19,5 @@ from .db import (
     get_all_completed_candidates,
     verify_recruiter,
     DEFAULT_RECRUITER_USERNAME,
-    DEFAULT_RECRUITER_PASSWORD,
+    get_recruiter_password,
 )

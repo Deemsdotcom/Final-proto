@@ -39,7 +39,7 @@ def main() -> None:
         if freshly_seeded:
             print("=" * 60)
             print("First-time setup complete.")
-            print(f"Default recruiter login: {db.DEFAULT_RECRUITER_USERNAME} / {db.DEFAULT_RECRUITER_PASSWORD}")
+            print(f"Default recruiter login: {db.DEFAULT_RECRUITER_USERNAME} / {db.get_recruiter_password()}")
             print("=" * 60)
 
     init_session_state()
