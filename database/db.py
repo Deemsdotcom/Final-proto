@@ -16,6 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
+import bcrypt
+
 DB_PATH = Path(__file__).parent.parent / "recruitment.db"
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
@@ -41,8 +43,41 @@ DEFAULT_RECRUITER_PASSWORD = _get_recruiter_password()
 
 
 def _hash_password(password: str) -> str:
-    """SHA-256 hash. Fine for a pilot; swap for bcrypt in production."""
+    """Hash a password using bcrypt with a per-call salt.
+
+    Returns the standard `$2b$...` modular crypt format. Non-deterministic:
+    two calls with the same input produce different hashes (which is the
+    point — bcrypt embeds the salt in the output).
+    """
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("ascii")
+
+
+def _legacy_sha256(password: str) -> str:
+    """Legacy SHA-256 hex digest used by the previous version of this app.
+
+    Kept only so we can recognize and seamlessly upgrade pre-existing
+    recruiter rows that were seeded under the old scheme.
+    """
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    """Check a candidate password against a stored hash.
+
+    Recognizes both the new bcrypt format (`$2...`) and the legacy SHA-256
+    hex format. Callers that need to migrate the stored hash should call
+    `_hash_password` after a successful legacy match and persist the new
+    value.
+    """
+    if not stored_hash:
+        return False
+    if stored_hash.startswith("$2"):
+        try:
+            return bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("ascii"))
+        except (ValueError, TypeError):
+            return False
+    # Legacy SHA-256 hex digest path.
+    return stored_hash == _legacy_sha256(password)
 
 
 @contextmanager
@@ -82,7 +117,6 @@ def init_db() -> bool:
         with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
             conn.executescript(f.read())
 
-        current_hash = _hash_password(DEFAULT_RECRUITER_PASSWORD)
         cur = conn.execute(
             "SELECT password_hash FROM recruiter_auth WHERE username = ?",
             (DEFAULT_RECRUITER_USERNAME,),
@@ -91,14 +125,25 @@ def init_db() -> bool:
         if row is None:
             conn.execute(
                 "INSERT INTO recruiter_auth (username, password_hash) VALUES (?, ?)",
-                (DEFAULT_RECRUITER_USERNAME, current_hash),
+                (DEFAULT_RECRUITER_USERNAME, _hash_password(DEFAULT_RECRUITER_PASSWORD)),
             )
             freshly_seeded = True
-        elif row["password_hash"] != current_hash:
-            conn.execute(
-                "UPDATE recruiter_auth SET password_hash = ? WHERE username = ?",
-                (current_hash, DEFAULT_RECRUITER_USERNAME),
-            )
+        else:
+            # bcrypt hashes are non-deterministic, so we can't compare hashes
+            # directly to detect a secret rotation. Instead we verify the
+            # currently-configured password against the stored hash:
+            #   - If it matches AND the stored hash is a legacy SHA-256 digest,
+            #     upgrade the row to a fresh bcrypt hash.
+            #   - If it doesn't match, the secret has rotated (or the stored
+            #     hash was for a different password) — re-hash and store.
+            stored = row["password_hash"]
+            currently_valid = _verify_password(DEFAULT_RECRUITER_PASSWORD, stored)
+            is_legacy = bool(stored) and not stored.startswith("$2")
+            if not currently_valid or is_legacy:
+                conn.execute(
+                    "UPDATE recruiter_auth SET password_hash = ? WHERE username = ?",
+                    (_hash_password(DEFAULT_RECRUITER_PASSWORD), DEFAULT_RECRUITER_USERNAME),
+                )
     return freshly_seeded
 
 
@@ -354,6 +399,12 @@ def get_all_completed_candidates() -> list[dict]:
 # ----- Auth -----
 
 def verify_recruiter(username: str, password: str) -> bool:
+    """Check the recruiter username/password.
+
+    Accepts both bcrypt-hashed and legacy SHA-256-hashed rows. If a legacy
+    row matches, it is transparently upgraded to a fresh bcrypt hash so the
+    next login uses the stronger scheme.
+    """
     with get_conn() as conn:
         row = conn.execute(
             "SELECT password_hash FROM recruiter_auth WHERE username = ?",
@@ -361,4 +412,13 @@ def verify_recruiter(username: str, password: str) -> bool:
         ).fetchone()
         if not row:
             return False
-        return row["password_hash"] == _hash_password(password)
+        stored = row["password_hash"]
+        if not _verify_password(password, stored):
+            return False
+        # Successful login — opportunistically upgrade legacy SHA-256 rows.
+        if stored and not stored.startswith("$2"):
+            conn.execute(
+                "UPDATE recruiter_auth SET password_hash = ? WHERE username = ?",
+                (_hash_password(password), username),
+            )
+        return True

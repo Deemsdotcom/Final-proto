@@ -7,4 +7,5 @@ openpyxl>=3.1.2
 python-dotenv>=1.0.1
 plotly>=5.20.0
 scipy>=1.11.0
+bcrypt>=4.1.0
 pytest>=7.4.0

@@ -134,7 +134,7 @@ These tests cover pure scoring logic only. They do not call the OpenAI API or to
 - **Microphone permission required.** Browsers will ask for mic access on Layer 3. A typed fallback is always available.
 - **Desktop-first.** Mobile layouts work but are not the priority.
 - **LLM scoring is approximately reproducible.** Even at `temperature=0`, OpenAI has minor infrastructure-level variance in outputs. The rubric scoring includes a JSON-extraction fallback for robustness.
-- **Password hashing is SHA-256, not bcrypt.** Fine for a pilot with one recruiter account. Swap for bcrypt before real deployment.
+- **Password hashing uses bcrypt.** Recruiter password rows are hashed with bcrypt (cost factor 12, the library default). Pre-existing SHA-256 hashes from earlier deploys are recognized and transparently upgraded to bcrypt on the next successful login.
 - **Per-question timer uses polling.** `streamlit-autorefresh` re-renders every second, which causes a visible flicker. Acceptable for a pilot; for production consider a JS component.
 
 ---
