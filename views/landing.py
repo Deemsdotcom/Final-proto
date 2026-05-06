@@ -47,8 +47,7 @@ def render() -> None:
     with col1:
         with ui.card("For Candidates"):
             st.markdown(
-                "<p>Begin a new assessment, or resume one already in progress. "
-                "The full session takes about 60 minutes end to end.</p>",
+                "<p>Begin a new assessment or resume an in-progress one.</p>",
                 unsafe_allow_html=True,
             )
             if st.button(
@@ -63,8 +62,7 @@ def render() -> None:
     with col2:
         with ui.card("For Recruiters"):
             st.markdown(
-                "<p>Access the dashboard to review completed assessments, "
-                "filter candidates, and export results.</p>",
+                "<p>Review completed assessments and export results.</p>",
                 unsafe_allow_html=True,
             )
             if st.button(
