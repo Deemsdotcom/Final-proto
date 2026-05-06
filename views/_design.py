@@ -1,25 +1,20 @@
 """Design system: shared CSS injection + reusable Streamlit components.
 
-Implements the Capgemini Invent dark visual language used across all pages.
-Anything style-related that can't be expressed via Streamlit's built-in
-theme (.streamlit/config.toml) lives here.
+Implements the Capgemini Invent visual language derived from the official
+2026 deck template (Bright / Blue / Dark themes).
 
-The public surface is a small set of helpers:
+Source-of-truth tokens:
+  Primary blue  #0058AB   Deep navy  #121A38   Bright cyan  #1DB8F2
 
-- inject_global_styles(): CSS for the whole app. Call once near the top of
-  every page render() — it is idempotent (re-injecting is harmless because
-  the CSS is wrapped in a <style> tag and overwrites itself).
-- header(): the top brand bar (Capgemini Invent wordmark + tagline).
-- eyebrow(): the small all-caps label above a heading
-  ("STAGE 2 OF 3").
-- page_title(): the bold heading + optional subtitle pattern.
-- card(): context manager that wraps content in a rounded surface card.
-- numbered_rule(): one entry in a "rules to follow" card list.
-- info_banner(): the soft cyan banner with an icon and a sentence
-  (used above CTAs).
-
-Color tokens are kept as Python constants so view code can reference them
-without sprinkling hex values around.
+Public surface:
+  inject_global_styles()  – call once at the top of every page render
+  header(meta)            – full-bleed top bar with Capgemini Invent logo
+  eyebrow(text)           – small all-caps cyan label above headings
+  page_title(title, sub)  – bold heading + optional muted subtitle
+  metric(value, label)    – KPI card (big number + short descriptor)
+  card(eyebrow_text)      – context manager: rounded surface card
+  numbered_rule(n, text)  – one item in a rules card
+  info_banner(text, icon) – left-accented cyan notice above CTAs
 """
 
 from __future__ import annotations
@@ -29,281 +24,318 @@ from typing import Iterator, Optional
 
 import streamlit as st
 
-# ----- Capgemini Invent palette -----------------------------------------
-# These mirror the brand reference: deep navy + a ladder of Capgemini
-# blues + the standard semantic colors for warnings/errors.
+# ── Capgemini Invent official palette (Dark 2026 theme) ─────────────────────
+# Sourced from theme1/2/3.xml of 20260414_Agentic_AI_in_Action_Swiss_Stories.pptx
 
-NAVY_DEEP = "#0B1729"      # page background
-NAVY_CARD = "#15233E"      # card surface
-NAVY_CARD_2 = "#1E2E4A"    # nested item surface (darker than card)
-NAVY_BORDER = "#26365A"    # 1px borders on cards / inputs
+NAVY_DEEP    = "#121A38"   # page background (official deep navy)
+NAVY_CARD    = "#1A2548"   # card surface   (derived +lighter)
+NAVY_CARD_2  = "#1E2D55"   # nested rows
+NAVY_BORDER  = "#28387A"   # 1 px borders
 
-BLUE_PRIMARY = "#1493D4"   # primary CTA — "Begin Game"
-BLUE_CYAN = "#1EB4FF"      # eyebrow text + small accents
-BLUE_ACCENT = "#5BC0EB"    # info banner background tint
-BLUE_DEEP = "#0070AD"      # Capgemini classic blue (secondary)
+BLUE_PRIMARY = "#0058AB"   # Capgemini primary blue
+BLUE_CYAN    = "#1DB8F2"   # bright cyan accent
+TEAL         = "#00828E"   # teal (secondary accent)
+AMBER        = "#FEB100"   # amber warning
+RED          = "#FF816E"   # red/error
+ORANGE       = "#BE4D00"   # burnt orange (severity)
+GREEN        = "#00D5D0"   # teal-green success
 
-TEXT_PRIMARY = "#FFFFFF"
-TEXT_SECONDARY = "#94A3B8"  # muted gray-blue for subtitles / help text
-TEXT_MUTED = "#64748B"
-
-AMBER = "#F59E0B"          # rule severity: caution
-RED = "#EF4444"            # rule severity: critical
-GREEN = "#10B981"          # success states
+TEXT_PRIMARY   = "#FFFFFF"
+TEXT_SECONDARY = "#A0AECB"   # muted on dark surface
+TEXT_MUTED     = "#6B7A9E"
 
 
-# ----- Global CSS -------------------------------------------------------
+# ── Capgemini Invent logo (inline SVG) ──────────────────────────────────────
+# Two overlapping angled stripes → Capgemini mark  +  Ubuntu-style wordmark
+_LOGO_SVG = (
+    '<svg viewBox="0 0 220 44" height="36" xmlns="http://www.w3.org/2000/svg">'
+    # mark: left stripe (primary blue)
+    '<path d="M2,38 L14,6 L21,6 L9,38 Z" fill="#0058AB"/>'
+    # mark: right stripe (bright cyan, slightly offset)
+    '<path d="M11,38 L23,6 L30,6 L18,38 Z" fill="#1DB8F2"/>'
+    # wordmark
+    '<text x="40" y="27"'
+    ' font-family="Ubuntu,Arial,sans-serif"'
+    ' font-weight="700" font-size="20" fill="#FFFFFF"'
+    '>Capgemini</text>'
+    '<text x="41" y="41"'
+    ' font-family="Ubuntu,Arial,sans-serif"'
+    ' font-weight="500" font-size="11" fill="#1DB8F2"'
+    ' letter-spacing="4">INVENT</text>'
+    '</svg>'
+)
 
-# Loaded once per page render. Targets Streamlit's generated DOM via
-# stable data-testid attributes where possible, and falls back to
-# class-based selectors with high specificity. Everything is scoped to
-# .stApp so it cannot leak outside the app surface.
+# Horizontal padding shared by the block-container and the header bleed
+_PAD = "3.5rem"
+
+# ── Global CSS ───────────────────────────────────────────────────────────────
 
 _GLOBAL_CSS = f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+/* Ubuntu from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap');
 
-/* ----- Base ------------------------------------------------------- */
+/* ── Base ──────────────────────────────────────────────────────────────── */
 .stApp {{
     background: {NAVY_DEEP};
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Ubuntu', Arial, sans-serif;
     color: {TEXT_PRIMARY};
 }}
 
-/* Tighten up the default Streamlit page padding so content has more room. */
-.stApp [data-testid="stMain"] .block-container {{
-    padding-top: 2rem;
-    padding-bottom: 4rem;
-    max-width: 880px;
+/* Remove Streamlit's outer padding so we control every pixel */
+.stApp > section[data-testid="stMain"] {{
+    padding: 0 !important;
 }}
 
-/* ----- Typography ------------------------------------------------- */
+/* Full-width block container */
+.stApp [data-testid="stMain"] .block-container {{
+    padding-top: 0 !important;
+    padding-bottom: 5rem !important;
+    padding-left: {_PAD} !important;
+    padding-right: {_PAD} !important;
+    max-width: 100% !important;
+    width: 100% !important;
+}}
+
+/* ── Typography ────────────────────────────────────────────────────────── */
 .stApp h1, .stApp h2, .stApp h3, .stApp h4 {{
     color: {TEXT_PRIMARY};
-    font-family: 'Inter', sans-serif;
+    font-family: 'Ubuntu', Arial, sans-serif;
     font-weight: 700;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
 }}
-.stApp h1 {{ font-size: 2.5rem; line-height: 1.15; }}
-.stApp h2 {{ font-size: 1.75rem; line-height: 1.2; }}
+.stApp h1 {{ font-size: 2.75rem; line-height: 1.1; margin-bottom: 0.5rem; }}
+.stApp h2 {{ font-size: 2rem;    line-height: 1.15; }}
 .stApp h3 {{ font-size: 1.25rem; line-height: 1.3; }}
 
 .stApp p, .stApp li, .stApp label {{
     color: {TEXT_PRIMARY};
     line-height: 1.6;
+    font-family: 'Ubuntu', Arial, sans-serif;
 }}
 
 .stApp .cap-subtitle {{
     color: {TEXT_SECONDARY};
     font-size: 1.05rem;
-    margin-top: -0.25rem;
-    margin-bottom: 1.5rem;
+    margin-top: 0.25rem;
+    margin-bottom: 0;
+    max-width: 680px;
+    line-height: 1.55;
 }}
 
 .stApp .cap-eyebrow {{
     display: inline-flex;
     align-items: center;
-    gap: 0.45rem;
+    gap: 0.5rem;
     color: {BLUE_CYAN};
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     font-weight: 700;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     margin-bottom: 0.6rem;
 }}
 .stApp .cap-eyebrow .dot {{
-    width: 0.5rem;
-    height: 0.5rem;
+    width: 0.4rem;
+    height: 0.4rem;
     border-radius: 50%;
     background: {BLUE_CYAN};
-    box-shadow: 0 0 0 4px rgba(30, 180, 255, 0.18);
+    box-shadow: 0 0 0 3px rgba(29,184,242,0.2);
+    flex-shrink: 0;
 }}
 
-/* ----- Header bar ------------------------------------------------- */
+/* ── Full-bleed header bar ─────────────────────────────────────────────── */
 .cap-header {{
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.5rem 0 1.75rem 0;
+    padding: 1rem {_PAD};
+    margin-left: -{_PAD};
+    margin-right: -{_PAD};
+    margin-bottom: 3rem;
     border-bottom: 1px solid {NAVY_BORDER};
-    margin-bottom: 2rem;
-}}
-.cap-header .brand {{
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    font-weight: 700;
-    font-size: 1.1rem;
-    letter-spacing: -0.01em;
-    color: {TEXT_PRIMARY};
-}}
-.cap-header .brand .mark {{
-    width: 1.6rem;
-    height: 1.6rem;
-    border-radius: 6px;
-    background: linear-gradient(135deg, {BLUE_PRIMARY} 0%, {BLUE_CYAN} 100%);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 800;
-    font-size: 0.95rem;
-    color: {NAVY_DEEP};
-    flex-shrink: 0;
-}}
-.cap-header .brand .invent {{
-    color: {BLUE_CYAN};
-    font-weight: 600;
-    margin-left: 0.1rem;
+    background: {NAVY_DEEP};
 }}
 .cap-header .meta {{
     color: {TEXT_SECONDARY};
-    font-size: 0.85rem;
+    font-size: 0.83rem;
+    font-weight: 500;
+    letter-spacing: 0.03em;
 }}
 
-/* ----- Cards ------------------------------------------------------ */
+/* ── KPI metric cards ──────────────────────────────────────────────────── */
+.cap-metric {{
+    background: {NAVY_CARD};
+    border: 1px solid {NAVY_BORDER};
+    border-top: 3px solid {BLUE_PRIMARY};
+    border-radius: 6px;
+    padding: 1.1rem 1.25rem;
+    text-align: left;
+}}
+.cap-metric .val {{
+    display: block;
+    font-size: 2rem;
+    font-weight: 700;
+    color: {TEXT_PRIMARY};
+    line-height: 1;
+    margin-bottom: 0.35rem;
+}}
+.cap-metric .lbl {{
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: {TEXT_SECONDARY};
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}}
+
+/* ── Cards ─────────────────────────────────────────────────────────────── */
 .cap-card {{
     background: {NAVY_CARD};
     border: 1px solid {NAVY_BORDER};
-    border-radius: 16px;
+    border-radius: 8px;
     padding: 1.75rem;
     margin: 1rem 0;
-    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset,
-                0 8px 32px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 2px 16px rgba(0,0,0,0.25);
 }}
 .cap-card .cap-card-eyebrow {{
     color: {TEXT_SECONDARY};
-    font-size: 0.78rem;
+    font-size: 0.73rem;
     font-weight: 700;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
+    padding-bottom: 0.75rem;
     margin-bottom: 1rem;
+    border-bottom: 1px solid {NAVY_BORDER};
 }}
 
-/* ----- Numbered rule list ---------------------------------------- */
+/* ── Numbered rule list ─────────────────────────────────────────────────── */
 .cap-rule {{
     display: flex;
-    align-items: center;
-    gap: 1rem;
+    align-items: flex-start;
+    gap: 0.9rem;
     background: {NAVY_CARD_2};
     border: 1px solid {NAVY_BORDER};
-    border-radius: 12px;
-    padding: 0.95rem 1.1rem;
-    margin-bottom: 0.7rem;
+    border-radius: 6px;
+    padding: 0.8rem 1rem;
+    margin-bottom: 0.5rem;
 }}
 .cap-rule:last-child {{ margin-bottom: 0; }}
 .cap-rule .num {{
     flex-shrink: 0;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
+    width: 1.65rem;
+    height: 1.65rem;
+    border-radius: 4px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 0.9rem;
-    border: 1.5px solid currentColor;
-    background: rgba(255, 255, 255, 0.02);
+    font-size: 0.82rem;
+    border: 1px solid currentColor;
+    background: rgba(255,255,255,0.03);
+    margin-top: 0.05rem;
 }}
-.cap-rule.sev-info .num   {{ color: {BLUE_CYAN}; }}
-.cap-rule.sev-warn .num   {{ color: {AMBER}; }}
-.cap-rule.sev-crit .num   {{ color: {RED}; }}
-.cap-rule .text {{ color: {TEXT_PRIMARY}; font-size: 0.98rem; }}
-
-/* ----- Info banner ------------------------------------------------ */
-.cap-banner {{
-    background: linear-gradient(135deg,
-        rgba(30, 180, 255, 0.15) 0%,
-        rgba(91, 192, 235, 0.10) 100%);
-    border: 1px solid rgba(30, 180, 255, 0.35);
+.cap-rule.sev-info .num {{ color: {BLUE_CYAN}; }}
+.cap-rule.sev-warn .num {{ color: {AMBER}; }}
+.cap-rule.sev-crit .num {{ color: {RED}; }}
+.cap-rule .text {{
     color: {TEXT_PRIMARY};
-    border-radius: 12px;
-    padding: 0.85rem 1.15rem;
+    font-size: 0.95rem;
+    line-height: 1.45;
+}}
+
+/* ── Info banner ───────────────────────────────────────────────────────── */
+.cap-banner {{
+    background: rgba(0,88,171,0.12);
+    border: 1px solid rgba(29,184,242,0.28);
+    border-left: 3px solid {BLUE_CYAN};
+    color: {TEXT_PRIMARY};
+    border-radius: 6px;
+    padding: 0.8rem 1.1rem;
     margin: 1rem 0;
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    font-size: 0.95rem;
+    gap: 0.7rem;
+    font-size: 0.93rem;
 }}
-.cap-banner .icon {{ color: {BLUE_CYAN}; }}
+.cap-banner .icon {{ color: {BLUE_CYAN}; flex-shrink: 0; }}
 
-/* ----- Buttons ---------------------------------------------------- */
-/* Primary buttons (type="primary") — bright Capgemini blue. */
+/* ── Primary buttons ────────────────────────────────────────────────────── */
 .stApp .stButton > button[kind="primary"],
 .stApp .stFormSubmitButton > button[kind="primary"] {{
     background: {BLUE_PRIMARY};
-    color: {NAVY_DEEP};
+    color: #FFFFFF;
     font-weight: 700;
+    font-family: 'Ubuntu', Arial, sans-serif;
     border: none;
-    border-radius: 12px;
-    padding: 0.85rem 1.5rem;
-    font-size: 1rem;
-    letter-spacing: 0.01em;
-    transition: transform 0.05s ease, box-shadow 0.15s ease, background 0.15s ease;
-    box-shadow: 0 4px 16px rgba(20, 147, 212, 0.35);
+    border-radius: 6px;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.95rem;
+    letter-spacing: 0.02em;
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 2px 10px rgba(0,88,171,0.35);
 }}
 .stApp .stButton > button[kind="primary"]:hover,
 .stApp .stFormSubmitButton > button[kind="primary"]:hover {{
-    background: {BLUE_CYAN};
-    box-shadow: 0 6px 24px rgba(30, 180, 255, 0.45);
-    color: {NAVY_DEEP};
+    background: #0068CC;
+    box-shadow: 0 4px 18px rgba(0,88,171,0.5);
 }}
 .stApp .stButton > button[kind="primary"]:active {{ transform: translateY(1px); }}
 
-/* Secondary buttons — outlined navy with white text. */
+/* ── Secondary buttons ─────────────────────────────────────────────────── */
 .stApp .stButton > button[kind="secondary"],
 .stApp .stFormSubmitButton > button[kind="secondary"] {{
     background: transparent;
     color: {TEXT_PRIMARY};
-    border: 1.5px solid {NAVY_BORDER};
-    border-radius: 12px;
-    padding: 0.8rem 1.5rem;
+    border: 1px solid {NAVY_BORDER};
+    border-radius: 6px;
+    padding: 0.75rem 1.5rem;
     font-weight: 600;
+    font-family: 'Ubuntu', Arial, sans-serif;
+    font-size: 0.95rem;
     transition: border-color 0.15s ease, background 0.15s ease;
 }}
 .stApp .stButton > button[kind="secondary"]:hover,
 .stApp .stFormSubmitButton > button[kind="secondary"]:hover {{
-    border-color: {BLUE_CYAN};
-    background: rgba(30, 180, 255, 0.08);
-    color: {TEXT_PRIMARY};
+    border-color: {BLUE_PRIMARY};
+    background: rgba(0,88,171,0.1);
 }}
 
-/* ----- Form inputs ----------------------------------------------- */
+/* ── Form inputs ────────────────────────────────────────────────────────── */
 .stApp [data-baseweb="input"],
 .stApp [data-baseweb="textarea"] {{
     background: {NAVY_CARD_2} !important;
-    border-radius: 10px !important;
+    border-radius: 6px !important;
 }}
 .stApp [data-baseweb="input"] input,
 .stApp [data-baseweb="textarea"] textarea {{
     background: {NAVY_CARD_2} !important;
     color: {TEXT_PRIMARY} !important;
     border: 1px solid {NAVY_BORDER} !important;
-    border-radius: 10px !important;
+    border-radius: 6px !important;
+    font-family: 'Ubuntu', Arial, sans-serif !important;
 }}
 .stApp [data-baseweb="input"] input:focus,
 .stApp [data-baseweb="textarea"] textarea:focus {{
     border-color: {BLUE_CYAN} !important;
-    box-shadow: 0 0 0 3px rgba(30, 180, 255, 0.18) !important;
+    box-shadow: 0 0 0 2px rgba(29,184,242,0.18) !important;
 }}
 
-/* ----- Radio / Checkbox ------------------------------------------ */
-.stApp [data-testid="stRadio"] label {{ color: {TEXT_PRIMARY}; }}
-
-/* ----- Progress bar ---------------------------------------------- */
+/* ── Progress bar ────────────────────────────────────────────────────────── */
 .stApp [data-testid="stProgress"] > div > div > div > div {{
     background: linear-gradient(90deg, {BLUE_PRIMARY}, {BLUE_CYAN});
+    border-radius: 2px;
 }}
 
-/* ----- Alerts (st.error / st.success / st.info / st.warning) ----- */
-.stApp [data-testid="stAlert"] {{
-    border-radius: 12px;
-    border: 1px solid {NAVY_BORDER};
-}}
+/* ── Radio / Checkbox ────────────────────────────────────────────────────── */
+.stApp [data-testid="stRadio"] label {{ color: {TEXT_PRIMARY}; }}
 
-/* ----- Divider ---------------------------------------------------- */
+/* ── Alerts ──────────────────────────────────────────────────────────────── */
+.stApp [data-testid="stAlert"] {{ border-radius: 6px; }}
+
+/* ── Divider ─────────────────────────────────────────────────────────────── */
 .stApp hr {{ border-color: {NAVY_BORDER}; opacity: 1; }}
 
-/* ----- Hide default Streamlit chrome ----------------------------- */
+/* ── Hide Streamlit chrome ───────────────────────────────────────────────── */
 .stApp [data-testid="stToolbar"] {{ visibility: hidden; height: 0; }}
 .stApp footer {{ visibility: hidden; }}
 .stApp #MainMenu {{ visibility: hidden; }}
@@ -312,70 +344,57 @@ _GLOBAL_CSS = f"""
 
 
 def inject_global_styles() -> None:
-    """Inject the app-wide CSS.
-
-    Idempotent — safe to call at the top of every page render. The browser
-    discards the previous <style> block and applies the new one.
-    """
+    """Inject the app-wide CSS. Idempotent — safe to call on every render."""
     st.markdown(_GLOBAL_CSS, unsafe_allow_html=True)
 
 
-# ----- Components -------------------------------------------------------
+# ── Components ────────────────────────────────────────────────────────────────
 
 def header(meta: Optional[str] = None) -> None:
-    """Render the top brand bar.
+    """Full-bleed top bar with the Capgemini Invent logo + optional right label."""
+    meta_html = f'<div class="meta">{_esc(meta)}</div>' if meta else ""
+    st.markdown(
+        f'<div class="cap-header">{_LOGO_SVG}{meta_html}</div>',
+        unsafe_allow_html=True,
+    )
 
-    `meta` is a small right-aligned label (e.g. "Candidate · Layer 2 of 3"
-    or the candidate's name on the dashboard).
-    """
-    meta_html = f'<div class="meta">{_escape(meta)}</div>' if meta else ""
+
+def eyebrow(text: str) -> None:
+    """Small all-caps cyan label with glowing dot — used above page titles."""
+    st.markdown(
+        f'<div class="cap-eyebrow"><span class="dot"></span>{_esc(text)}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def page_title(title: str, subtitle: Optional[str] = None) -> None:
+    """Bold Ubuntu heading + optional muted subtitle."""
+    st.markdown(f"<h1>{_esc(title)}</h1>", unsafe_allow_html=True)
+    if subtitle:
+        st.markdown(
+            f'<p class="cap-subtitle">{_esc(subtitle)}</p>',
+            unsafe_allow_html=True,
+        )
+
+
+def metric(value: str, label: str) -> None:
+    """KPI card — big value + short uppercase descriptor."""
     st.markdown(
         f"""
-        <div class="cap-header">
-            <div class="brand">
-                <span class="mark">C</span>
-                <span>Capgemini <span class="invent">Invent</span></span>
-            </div>
-            {meta_html}
+        <div class="cap-metric">
+            <span class="val">{_esc(value)}</span>
+            <span class="lbl">{_esc(label)}</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-def eyebrow(text: str) -> None:
-    """Small all-caps label with a glowing dot, used above page titles."""
-    st.markdown(
-        f'<div class="cap-eyebrow"><span class="dot"></span>{_escape(text)}</div>',
-        unsafe_allow_html=True,
-    )
-
-
-def page_title(title: str, subtitle: Optional[str] = None) -> None:
-    """Bold heading + optional muted subtitle."""
-    st.markdown(f"<h1>{_escape(title)}</h1>", unsafe_allow_html=True)
-    if subtitle:
-        st.markdown(
-            f'<div class="cap-subtitle">{_escape(subtitle)}</div>',
-            unsafe_allow_html=True,
-        )
-
-
 @contextmanager
 def card(eyebrow_text: Optional[str] = None) -> Iterator[None]:
-    """Context manager that wraps following Streamlit calls in a styled card.
-
-    Usage:
-        with card("Rules to follow"):
-            numbered_rule(1, "...", severity="info")
-            ...
-
-    Implementation note: Streamlit doesn't let us wrap arbitrary widgets
-    in custom HTML, so we open the card div, render the widgets inside
-    a st.container(), then close the div. The container ensures DOM order.
-    """
+    """Context manager — wraps Streamlit widgets in a dark surface card."""
     eyebrow_html = (
-        f'<div class="cap-card-eyebrow">{_escape(eyebrow_text)}</div>'
+        f'<div class="cap-card-eyebrow">{_esc(eyebrow_text)}</div>'
         if eyebrow_text
         else ""
     )
@@ -387,10 +406,7 @@ def card(eyebrow_text: Optional[str] = None) -> Iterator[None]:
 
 
 def numbered_rule(num: int, text: str, severity: str = "info") -> None:
-    """One numbered item in a rules card.
-
-    severity: "info" (blue), "warn" (amber), "crit" (red).
-    """
+    """One numbered item in a rules card. severity: info / warn / crit."""
     sev_class = {"info": "sev-info", "warn": "sev-warn", "crit": "sev-crit"}.get(
         severity, "sev-info"
     )
@@ -398,7 +414,7 @@ def numbered_rule(num: int, text: str, severity: str = "info") -> None:
         f"""
         <div class="cap-rule {sev_class}">
             <span class="num">{num}</span>
-            <span class="text">{_escape(text)}</span>
+            <span class="text">{_esc(text)}</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -406,30 +422,20 @@ def numbered_rule(num: int, text: str, severity: str = "info") -> None:
 
 
 def info_banner(text: str, icon: str = "ℹ") -> None:
-    """Soft cyan banner for inline contextual notes (above CTAs)."""
+    """Left-accented cyan banner for contextual notes above CTAs."""
     st.markdown(
         f"""
         <div class="cap-banner">
             <span class="icon">{icon}</span>
-            <span>{_escape(text)}</span>
+            <span>{_esc(text)}</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-# ----- Internal ---------------------------------------------------------
+# ── Internal ──────────────────────────────────────────────────────────────────
 
-def _escape(text: object) -> str:
-    """Minimal HTML escape for the small set of helpers above.
-
-    The components only accept short strings (titles, labels, single
-    sentences), so we don't need a full HTML sanitizer — just enough to
-    keep stray angle brackets from breaking layout.
-    """
+def _esc(text: object) -> str:
     s = str(text) if text is not None else ""
-    return (
-        s.replace("&", "&amp;")
-         .replace("<", "&lt;")
-         .replace(">", "&gt;")
-    )
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")

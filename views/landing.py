@@ -19,19 +19,35 @@ def render() -> None:
     ui.inject_global_styles()
     ui.header()
 
-    ui.eyebrow("Consulting recruitment assessment")
+    # ── Hero ──────────────────────────────────────────────────────────────
+    ui.eyebrow("Consulting Recruitment · Capgemini Invent")
     ui.page_title(
         "A focused, modern hiring experience.",
         "Cognitive reasoning, a firm-management simulation, and an AI-led interview — "
         "completed in one session.",
     )
 
+    # ── KPI stat bar ──────────────────────────────────────────────────────
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
+    k1, k2, k3, k4 = st.columns(4, gap="small")
+    with k1:
+        ui.metric("3", "Assessment Layers")
+    with k2:
+        ui.metric("~60 min", "Total Duration")
+    with k3:
+        ui.metric("AI", "Powered Interview")
+    with k4:
+        ui.metric("Live", "Results Dashboard")
+
+    st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
+
+    # ── Action cards ──────────────────────────────────────────────────────
     col1, col2 = st.columns(2, gap="large")
 
     with col1:
         with ui.card("For Candidates"):
             st.markdown(
-                "<p>Begin a new assessment, or resume one that's already in progress. "
+                "<p>Begin a new assessment, or resume one already in progress. "
                 "The full session takes about 60 minutes end to end.</p>",
                 unsafe_allow_html=True,
             )
@@ -67,7 +83,7 @@ def render() -> None:
 
 
 def _candidate_form() -> None:
-    st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
     with ui.card("Start your assessment"):
         with st.form("candidate_form"):
             name = st.text_input("Full name", max_chars=100)
@@ -84,7 +100,6 @@ def _candidate_form() -> None:
         st.error("Please enter a valid email address.")
         return
 
-    # check for an in-progress session
     existing = db.find_candidate_by_email(email.strip().lower())
     if existing and existing["current_stage"] not in ("done",):
         st.info(
@@ -95,7 +110,6 @@ def _candidate_form() -> None:
         st.rerun()
         return
 
-    # new candidate
     candidate_id = str(uuid.uuid4())
     db.create_candidate(candidate_id, name.strip(), email.strip().lower())
 
@@ -108,7 +122,7 @@ def _candidate_form() -> None:
 
 
 def _recruiter_form() -> None:
-    st.markdown("<div style='height: 1.5rem;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
     with ui.card("Recruiter login"):
         with st.form("recruiter_form"):
             username = st.text_input("Username")

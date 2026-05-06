@@ -1,24 +1,19 @@
-# Streamlit theme — Capgemini Invent dark palette
-#
-# Uses a deep navy background with bright Capgemini blues for highlights
-# and CTAs. Most page-level styling is also injected via CSS in
-# views/_design.py (theme tokens here are only what Streamlit's built-in
-# theming system exposes).
+# Streamlit theme — Capgemini Invent Dark 2026
+# Tokens sourced from 20260414_Agentic_AI_in_Action_Swiss_Stories.pptx theme XML
 
 [theme]
 base = "dark"
 
-# Bright electric blue used for primary buttons, sliders, focus rings.
-# Matches the "Begin Game" CTA in the design reference.
-primaryColor = "#1493D4"
+# Official Capgemini primary blue
+primaryColor = "#0058AB"
 
-# Deep navy page background.
-backgroundColor = "#0B1729"
+# Official Capgemini deep navy
+backgroundColor = "#121A38"
 
-# Slightly lighter navy used by Streamlit for cards, expanders, sidebar.
-secondaryBackgroundColor = "#1A2740"
+# Slightly lighter navy for Streamlit-managed card surfaces
+secondaryBackgroundColor = "#1A2548"
 
-# Primary text color (white on dark surfaces).
+# Primary text
 textColor = "#FFFFFF"
 
 font = "sans serif"
