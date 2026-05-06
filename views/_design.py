@@ -329,6 +329,12 @@ _GLOBAL_CSS = f"""
 /* ── Radio / Checkbox ────────────────────────────────────────────────────── */
 .stApp [data-testid="stRadio"] label {{ color: {TEXT_PRIMARY}; }}
 
+/* ── Card paragraph — equalise heights across sibling cards ─────────────── */
+.cap-card p {{
+    min-height: 3.8rem;
+    margin: 0 0 1.25rem 0;
+}}
+
 /* ── Alerts ──────────────────────────────────────────────────────────────── */
 .stApp [data-testid="stAlert"] {{ border-radius: 6px; }}
 
