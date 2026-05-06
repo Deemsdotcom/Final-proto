@@ -362,19 +362,36 @@ _GLOBAL_CSS = f"""
 .stApp footer {{ visibility: hidden; }}
 .stApp #MainMenu {{ visibility: hidden; }}
 
-/* ── Equal-height columns ────────────────────────────────────────────────── */
+/* ── Equal-height columns — full flex cascade to pin button at bottom ──────── */
+/* Row: stretch all columns to the tallest one's height */
 .stApp [data-testid="stHorizontalBlock"] {{
     align-items: stretch !important;
     gap: 1.5rem;
 }}
+/* Column: flex column, full height */
 .stApp [data-testid="stColumn"] {{
     display: flex !important;
     flex-direction: column !important;
 }}
-.stApp [data-testid="stColumn"] > div {{
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+/* Outer stVerticalBlock inside column */
+.stApp [data-testid="stColumn"] > div[data-testid="stVerticalBlock"] {{
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+}}
+/* Border wrapper fills its column */
+.stApp [data-testid="stVerticalBlockBorderWrapper"] {{
+    flex: 1 !important;
+}}
+/* Inner stVerticalBlock: flex column so children can be distributed */
+.stApp [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"] {{
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+}}
+/* Description markdown grows to fill available space → button naturally at bottom */
+.stApp [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stMarkdown"] {{
+    flex: 1 !important;
 }}
 </style>
 """
