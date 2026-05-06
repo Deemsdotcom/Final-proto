@@ -1,0 +1,27 @@
+# Secrets — never commit these
+.env
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Local data
+*.db
+*.sqlite
+*.sqlite3
+logs/*.log
+recordings/*.wav
+recordings/*.mp3
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
