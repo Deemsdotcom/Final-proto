@@ -188,16 +188,31 @@ _GLOBAL_CSS = f"""
     text-transform: uppercase;
 }}
 
-/* ── Cards ─────────────────────────────────────────────────────────────── */
-.cap-card {{
-    background: {NAVY_CARD};
-    border: 1px solid {NAVY_BORDER};
-    border-radius: 8px;
-    padding: 1.75rem;
-    margin: 1rem 0;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.25);
+/* ── Cards (styled via Streamlit's bordered container) ─────────────────── */
+/* st.container(border=True) renders as stVerticalBlockBorderWrapper        */
+.stApp [data-testid="stVerticalBlockBorderWrapper"] {{
+    background: {NAVY_CARD} !important;
+    border: 1px solid {NAVY_BORDER} !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.25) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
 }}
-.cap-card .cap-card-eyebrow {{
+/* Inner block — also flex so button can be pushed down */
+.stApp [data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="stVerticalBlock"] {{
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+    padding: 1.5rem !important;
+}}
+/* Button pinned to the bottom of its card */
+.stApp [data-testid="stVerticalBlockBorderWrapper"] .stButton {{
+    margin-top: auto !important;
+    padding-top: 1rem;
+}}
+/* Eyebrow label inside the card */
+.cap-card-eyebrow {{
     color: {TEXT_SECONDARY};
     font-size: 0.73rem;
     font-weight: 700;
@@ -206,6 +221,7 @@ _GLOBAL_CSS = f"""
     padding-bottom: 0.75rem;
     margin-bottom: 1rem;
     border-bottom: 1px solid {NAVY_BORDER};
+    display: block;
 }}
 
 /* ── Numbered rule list ─────────────────────────────────────────────────── */
@@ -346,34 +362,19 @@ _GLOBAL_CSS = f"""
 .stApp footer {{ visibility: hidden; }}
 .stApp #MainMenu {{ visibility: hidden; }}
 
-/* ── Equal-height columns: stretch both cards, pin button to bottom ──────── */
-/* 1. Make the row stretch columns to equal height */
+/* ── Equal-height columns ────────────────────────────────────────────────── */
 .stApp [data-testid="stHorizontalBlock"] {{
     align-items: stretch !important;
     gap: 1.5rem;
 }}
-/* 2. Each column is a flex column so it fills the row height */
 .stApp [data-testid="stColumn"] {{
     display: flex !important;
     flex-direction: column !important;
 }}
-/* 3. Streamlit injects one wrapper div inside the column — flex it too */
 .stApp [data-testid="stColumn"] > div {{
     flex: 1;
     display: flex;
     flex-direction: column;
-}}
-/* 4. The card itself must grow to fill the column */
-.stApp .cap-card {{
-    flex: 1 !important;
-    display: flex;
-    flex-direction: column;
-}}
-/* 5. Button wrapper is pushed to the bottom via auto top margin */
-.stApp .cap-card .stButton,
-.stApp .cap-card [data-testid="stButton"] {{
-    margin-top: auto;
-    padding-top: 1rem;
 }}
 </style>
 """
@@ -428,17 +429,19 @@ def metric(value: str, label: str) -> None:
 
 @contextmanager
 def card(eyebrow_text: Optional[str] = None) -> Iterator[None]:
-    """Context manager — wraps Streamlit widgets in a dark surface card."""
-    eyebrow_html = (
-        f'<div class="cap-card-eyebrow">{_esc(eyebrow_text)}</div>'
-        if eyebrow_text
-        else ""
-    )
-    st.markdown(f'<div class="cap-card">{eyebrow_html}', unsafe_allow_html=True)
-    try:
+    """Context manager — wraps Streamlit widgets in a styled bordered card.
+
+    Uses st.container(border=True) so Streamlit properly wraps all yielded
+    widgets. The border/background/radius are applied via CSS targeting
+    [data-testid="stVerticalBlockBorderWrapper"].
+    """
+    with st.container(border=True):
+        if eyebrow_text:
+            st.markdown(
+                f'<span class="cap-card-eyebrow">{_esc(eyebrow_text)}</span>',
+                unsafe_allow_html=True,
+            )
         yield
-    finally:
-        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def numbered_rule(num: int, text: str, severity: str = "info") -> None:
