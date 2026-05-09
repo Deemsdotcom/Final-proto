@@ -397,6 +397,74 @@ _GLOBAL_CSS = f"""
 }}
 /* (No per-markdown flex rule needed — the last-child margin-top:auto
    above takes care of bottom-aligning the CTA in action cards.) */
+
+/* ── Vertical journey timeline ─────────────────────────────────────────────
+   Used by ui.journey_timeline() — a column of "stations" (numbered
+   circles) connected by a glowing cyan rail, with each station's content
+   to the right of its circle. */
+.cap-journey {{
+    position: relative;
+    padding-left: 4.5rem;
+    margin: 1.75rem 0 1.5rem 0;
+}}
+/* The continuous rail running through every station. The top/bottom
+   insets keep the rail from extending past the first and last circles. */
+.cap-journey::before {{
+    content: "";
+    position: absolute;
+    left: 1.85rem;
+    top: 1.5rem;
+    bottom: 2.0rem;
+    width: 2px;
+    background: linear-gradient(180deg, {CYAN} 0%, {BLUE_PRIMARY} 100%);
+    opacity: 0.55;
+}}
+.cap-station {{
+    position: relative;
+    margin-bottom: 1.6rem;
+    min-height: 3rem;
+}}
+.cap-station:last-child {{ margin-bottom: 0; }}
+.cap-station .cap-station-circle {{
+    position: absolute;
+    left: -3.65rem;
+    top: 0;
+    width: 2.7rem;
+    height: 2.7rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, {BLUE_PRIMARY} 0%, {CYAN} 100%);
+    color: {NAVY_DEEP};
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    font-weight: 800;
+    box-shadow: 0 0 0 4px rgba(30, 180, 255, 0.18),
+                0 4px 18px rgba(30, 180, 255, 0.35);
+    z-index: 1;
+}}
+.cap-station .cap-station-meta {{
+    color: {CYAN};
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+}}
+.cap-station .cap-station-title {{
+    color: {TEXT_PRIMARY};
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 0.35rem;
+    letter-spacing: -0.01em;
+}}
+.cap-station .cap-station-desc {{
+    color: {TEXT_SECONDARY};
+    font-size: 1rem;
+    line-height: 1.55;
+    max-width: 56rem;
+}}
 </style>
 """
 
@@ -499,3 +567,27 @@ def info_banner(text: str, icon: str = "ℹ") -> None:
 def _esc(text: object) -> str:
     s = str(text) if text is not None else ""
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def journey_timeline(items: list) -> None:
+    """Render a vertical timeline of "stations" connected by a cyan rail.
+
+    `items` is a list of dicts with keys: num, meta, title, desc.
+    Each station shows a numbered circle on the rail, with the meta tag,
+    bold title, and description rendered to the right. Use for the
+    welcome page (3 layers) or anywhere else a sequenced journey is
+    clearer than a horizontal stat strip or card grid.
+    """
+    rows = []
+    for item in items:
+        rows.append(
+            f"""
+            <div class="cap-station">
+              <div class="cap-station-circle">{_esc(item.get("num", ""))}</div>
+              <div class="cap-station-meta">{_esc(item.get("meta", ""))}</div>
+              <div class="cap-station-title">{_esc(item.get("title", ""))}</div>
+              <div class="cap-station-desc">{_esc(item.get("desc", ""))}</div>
+            </div>
+            """
+        )
+    st.markdown(f'<div class="cap-journey">{"".join(rows)}</div>', unsafe_allow_html=True)
