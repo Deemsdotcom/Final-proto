@@ -137,11 +137,11 @@ def _layer_overview() -> None:
         )
         ui.numbered_rule(
             4, "A stable internet connection — your answers save automatically as you go.",
-            severity="warn",
+            severity="info",
         )
         ui.numbered_rule(
             5, "Time-outs count as incorrect, and answered questions cannot be revisited.",
-            severity="crit",
+            severity="info",
         )
 
     st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
