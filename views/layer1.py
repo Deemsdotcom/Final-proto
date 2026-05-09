@@ -64,71 +64,92 @@ def render() -> None:
 
 
 def _layer_overview() -> None:
-    """Layer 1 overview shown once before the first theme intro."""
+    """Layer 1 overview shown once before the first theme intro.
+
+    Three theme hero cards across the top (Logical · Numerical · Verbal),
+    each with its own inline SVG illustration and stat strip. A compact
+    "Before you begin" prep card below, then info banner + CTA.
+    """
     ui.inject_global_styles()
-    ui.header()
+    ui.header(meta=f"Candidate · {st.session_state.candidate_name}")
 
     ui.eyebrow("Stage 1 of 3 · Cognitive Assessment")
     ui.page_title(
-        "Cognitive Assessment",
-        "Three timed reasoning themes. Read the rules carefully before you begin.",
+        "Three reasoning themes, one timed sprint",
+        "About 30 minutes total. Each theme has its own time limit per question.",
     )
 
-    import streamlit as st  # local alias for clarity
+    st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
 
-    col1, col2 = st.columns(2, gap="large")
-
-    with col1:
-        with ui.card("Themes you'll complete"):
-            ui.numbered_rule(
-                1, "Logical Reasoning — abstract 3×3 matrix puzzles. Pick the figure that completes the pattern.",
-                severity="info",
-            )
-            ui.numbered_rule(
-                2, "Numerical Reasoning — short charts and tables, then a multiple-choice question about the data.",
-                severity="info",
-            )
-            ui.numbered_rule(
-                3, "Verbal Reasoning — a short passage with a statement. Decide True, False, or Cannot Say.",
-                severity="info",
-            )
-            ui.numbered_rule(
-                4, f"{QUESTIONS_PER_THEME} questions per theme, each with its own per-question time limit.",
-                severity="info",
-            )
-            ui.numbered_rule(
-                5, "Themes are presented in fixed order — you cannot return to a previous theme.",
-                severity="info",
-            )
-
-    with col2:
-        with ui.card("Before you begin"):
-            ui.numbered_rule(
-                1, "Pen and paper for working through problems.",
-                severity="info",
-            )
-            ui.numbered_rule(
-                2, "A calculator — the numerical theme uses percentages, ratios, and multi-step figures.",
-                severity="info",
-            )
-            ui.numbered_rule(
-                3, "A quiet, uninterrupted environment for the next ~30 minutes.",
-                severity="info",
-            )
-            ui.numbered_rule(
-                4, "A stable internet connection — your answers save automatically as you go.",
-                severity="info",
-            )
-            ui.numbered_rule(
-                5, "Time-outs count as incorrect, and answered questions cannot be revisited.",
-                severity="info",
-            )
+    # Three theme hero cards
+    c1, c2, c3 = st.columns(3, gap="medium")
+    with c1:
+        ui.theme_card(
+            icon_svg=ui.THEME_ICON_LOGICAL,
+            meta="Theme 1",
+            title="Logical Reasoning",
+            desc=(
+                "Abstract 3×3 matrix puzzles. Spot the pattern across rows "
+                "and columns, then pick the figure that completes the grid."
+            ),
+            stats=[(f"{QUESTIONS_PER_THEME}", "Questions"), ("75 s", "Per question")],
+        )
+    with c2:
+        ui.theme_card(
+            icon_svg=ui.THEME_ICON_NUMERICAL,
+            meta="Theme 2",
+            title="Numerical Reasoning",
+            desc=(
+                "Short charts and tables followed by a multiple-choice "
+                "question. Percentages, ratios, growth rates — calculator "
+                "is recommended."
+            ),
+            stats=[(f"{QUESTIONS_PER_THEME}", "Questions"), ("90 s", "Per question")],
+        )
+    with c3:
+        ui.theme_card(
+            icon_svg=ui.THEME_ICON_VERBAL,
+            meta="Theme 3",
+            title="Verbal Reasoning",
+            desc=(
+                "Read a short passage, then judge a statement: True, False, "
+                "or Cannot Say. Use only what the passage says — no outside "
+                "knowledge."
+            ),
+            stats=[(f"{QUESTIONS_PER_THEME}", "Questions"), ("60 s", "Per question")],
+        )
 
     st.markdown("<div style='height:1.25rem'></div>", unsafe_allow_html=True)
+
+    # Compact prep checklist — single full-width card
+    with ui.card("Before you begin"):
+        ui.numbered_rule(
+            1, "Pen and paper for working through problems.",
+            severity="info",
+        )
+        ui.numbered_rule(
+            2, "A calculator — the numerical theme uses percentages, ratios, and multi-step figures.",
+            severity="info",
+        )
+        ui.numbered_rule(
+            3, "A quiet, uninterrupted environment for the next ~30 minutes.",
+            severity="info",
+        )
+        ui.numbered_rule(
+            4, "A stable internet connection — your answers save automatically as you go.",
+            severity="warn",
+        )
+        ui.numbered_rule(
+            5, "Time-outs count as incorrect, and answered questions cannot be revisited.",
+            severity="crit",
+        )
+
+    st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
     ui.info_banner(
         "Pick the best answer for each question — you will not see whether you got each one right.",
         icon="ℹ",
     )
+    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
 
     if st.button(
         "Continue to Logical Reasoning",

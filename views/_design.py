@@ -465,6 +465,94 @@ _GLOBAL_CSS = f"""
     line-height: 1.55;
     max-width: 56rem;
 }}
+
+/* ── Theme hero cards ──────────────────────────────────────────────────────
+   Used by ui.theme_card() — a tall card with an inline SVG illustration
+   at the top, a meta pill, big theme name, and a short description. Used
+   on the Layer 1 overview to give each reasoning theme its own visual
+   identity. */
+.cap-theme-card {{
+    background: {NAVY_CARD};
+    border: 1px solid {NAVY_BORDER};
+    border-top: 3px solid {BLUE_CYAN};
+    border-radius: 8px;
+    padding: 1.6rem 1.4rem 1.4rem 1.4rem;
+    margin: 0.5rem 0;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}}
+.cap-theme-card .cap-theme-icon {{
+    width: 4.5rem;
+    height: 4.5rem;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(29,184,242,0.12) 0%, rgba(0,88,171,0.18) 100%);
+    border: 1px solid rgba(29,184,242,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.2rem;
+}}
+.cap-theme-card .cap-theme-icon svg {{
+    width: 2.6rem;
+    height: 2.6rem;
+}}
+.cap-theme-card .cap-theme-icon svg .stroke {{ stroke: {BLUE_CYAN}; }}
+.cap-theme-card .cap-theme-icon svg .fill   {{ fill:   {BLUE_CYAN}; }}
+.cap-theme-card .cap-theme-meta {{
+    display: inline-block;
+    align-self: flex-start;
+    color: {BLUE_CYAN};
+    background: rgba(29,184,242,0.10);
+    border: 1px solid rgba(29,184,242,0.30);
+    padding: 0.20rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 0.55rem;
+}}
+.cap-theme-card .cap-theme-title {{
+    color: {TEXT_PRIMARY};
+    font-size: 1.55rem;
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 0.55rem;
+    letter-spacing: -0.01em;
+}}
+.cap-theme-card .cap-theme-desc {{
+    color: {TEXT_SECONDARY};
+    font-size: 0.95rem;
+    line-height: 1.5;
+    flex: 1;
+}}
+.cap-theme-card .cap-theme-stat {{
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid {NAVY_BORDER};
+}}
+.cap-theme-card .cap-theme-stat-item {{
+    display: flex;
+    flex-direction: column;
+}}
+.cap-theme-card .cap-theme-stat-value {{
+    color: {TEXT_PRIMARY};
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.1;
+}}
+.cap-theme-card .cap-theme-stat-label {{
+    color: {TEXT_MUTED};
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 0.15rem;
+}}
 </style>
 """
 
@@ -595,4 +683,86 @@ def journey_timeline(items: list) -> None:
             '</div>'
         )
     html = '<div class="cap-journey">' + "".join(parts) + '</div>'
+    st.markdown(html, unsafe_allow_html=True)
+
+
+# ── SVG icons for the three Layer 1 themes ─────────────────────────────────
+# Each icon is a 60×60 viewBox using the .stroke / .fill classes so the
+# theme card CSS can colour them via class selectors. Logical: a 3×3 grid
+# with the bottom-right cell missing (the matrix puzzle). Numerical: a
+# four-bar bar chart. Verbal: stacked horizontal text lines.
+
+THEME_ICON_LOGICAL = (
+    '<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" fill="none">'
+    '<rect class="fill" x="3"  y="3"  width="14" height="14" rx="2"/>'
+    '<rect class="fill" x="23" y="3"  width="14" height="14" rx="2"/>'
+    '<rect class="fill" x="43" y="3"  width="14" height="14" rx="2"/>'
+    '<rect class="fill" x="3"  y="23" width="14" height="14" rx="2"/>'
+    '<rect class="fill" x="23" y="23" width="14" height="14" rx="2"/>'
+    '<rect class="fill" x="43" y="23" width="14" height="14" rx="2"/>'
+    '<rect class="fill" x="3"  y="43" width="14" height="14" rx="2"/>'
+    '<rect class="fill" x="23" y="43" width="14" height="14" rx="2"/>'
+    '<rect class="stroke" x="43" y="43" width="14" height="14" rx="2" '
+    'stroke-width="2" stroke-dasharray="3 2"/>'
+    '</svg>'
+)
+THEME_ICON_NUMERICAL = (
+    '<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" fill="none">'
+    '<rect class="fill" x="6"  y="35" width="8" height="20" rx="1"/>'
+    '<rect class="fill" x="20" y="20" width="8" height="35" rx="1"/>'
+    '<rect class="fill" x="34" y="28" width="8" height="27" rx="1"/>'
+    '<rect class="fill" x="48" y="12" width="8" height="43" rx="1"/>'
+    '<line class="stroke" x1="3" y1="56" x2="58" y2="56" stroke-width="1.5"/>'
+    '</svg>'
+)
+THEME_ICON_VERBAL = (
+    '<svg viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg" fill="none">'
+    '<rect class="fill" x="6"  y="12" width="48" height="3" rx="1.5"/>'
+    '<rect class="fill" x="6"  y="22" width="48" height="3" rx="1.5"/>'
+    '<rect class="fill" x="6"  y="32" width="32" height="3" rx="1.5"/>'
+    '<line class="stroke" x1="6" y1="42" x2="54" y2="42" '
+    'stroke-width="1" stroke-dasharray="3 2"/>'
+    '<rect class="fill" x="6"  y="48" width="40" height="3" rx="1.5"/>'
+    '</svg>'
+)
+
+
+def theme_card(
+    icon_svg: str,
+    meta: str,
+    title: str,
+    desc: str,
+    stats: Optional[list] = None,
+) -> None:
+    """Render a tall theme hero card with an SVG icon, meta pill, title,
+    description, and an optional row of small stat boxes at the bottom.
+
+    `stats` is a list of (value, label) tuples. They render as a thin
+    bordered strip across the bottom of the card — ideal for showing
+    things like "10 questions" + "75 sec / question".
+
+    HTML is emitted as a single line to avoid Streamlit's markdown parser
+    treating indented blocks as code (same gotcha as journey_timeline).
+    """
+    stats_html = ""
+    if stats:
+        items = []
+        for value, label in stats:
+            items.append(
+                '<div class="cap-theme-stat-item">'
+                '<div class="cap-theme-stat-value">' + _esc(value) + '</div>'
+                '<div class="cap-theme-stat-label">' + _esc(label) + '</div>'
+                '</div>'
+            )
+        stats_html = '<div class="cap-theme-stat">' + "".join(items) + '</div>'
+
+    html = (
+        '<div class="cap-theme-card">'
+        '<div class="cap-theme-icon">' + icon_svg + '</div>'
+        '<div class="cap-theme-meta">' + _esc(meta) + '</div>'
+        '<div class="cap-theme-title">' + _esc(title) + '</div>'
+        '<div class="cap-theme-desc">' + _esc(desc) + '</div>'
+        + stats_html +
+        '</div>'
+    )
     st.markdown(html, unsafe_allow_html=True)
