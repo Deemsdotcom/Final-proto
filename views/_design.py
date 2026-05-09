@@ -416,7 +416,7 @@ _GLOBAL_CSS = f"""
     top: 1.5rem;
     bottom: 2.0rem;
     width: 2px;
-    background: linear-gradient(180deg, {CYAN} 0%, {BLUE_PRIMARY} 100%);
+    background: linear-gradient(180deg, {BLUE_CYAN} 0%, {BLUE_PRIMARY} 100%);
     opacity: 0.55;
 }}
 .cap-station {{
@@ -432,7 +432,7 @@ _GLOBAL_CSS = f"""
     width: 2.7rem;
     height: 2.7rem;
     border-radius: 50%;
-    background: linear-gradient(135deg, {BLUE_PRIMARY} 0%, {CYAN} 100%);
+    background: linear-gradient(135deg, {BLUE_PRIMARY} 0%, {BLUE_CYAN} 100%);
     color: {NAVY_DEEP};
     display: flex;
     align-items: center;
@@ -444,7 +444,7 @@ _GLOBAL_CSS = f"""
     z-index: 1;
 }}
 .cap-station .cap-station-meta {{
-    color: {CYAN};
+    color: {BLUE_CYAN};
     font-size: 0.78rem;
     font-weight: 700;
     letter-spacing: 0.18em;
