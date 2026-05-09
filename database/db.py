@@ -126,33 +126,35 @@ def init_db() -> bool:
         with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
             conn.executescript(f.read())
 
+        # Race-safe seed: INSERT OR IGNORE silently no-ops if another
+        # concurrent init_db() (different Streamlit session, same SQLite
+        # file) already inserted the row. cur.rowcount is 1 on success,
+        # 0 if the row already existed.
         cur = conn.execute(
-            "SELECT password_hash FROM recruiter_auth WHERE username = ?",
-            (DEFAULT_RECRUITER_USERNAME,),
+            "INSERT OR IGNORE INTO recruiter_auth (username, password_hash) VALUES (?, ?)",
+            (DEFAULT_RECRUITER_USERNAME, _hash_password(configured_password)),
         )
-        row = cur.fetchone()
-        if row is None:
-            conn.execute(
-                "INSERT INTO recruiter_auth (username, password_hash) VALUES (?, ?)",
-                (DEFAULT_RECRUITER_USERNAME, _hash_password(configured_password)),
-            )
-            freshly_seeded = True
-        else:
-            # bcrypt hashes are non-deterministic, so we can't compare hashes
-            # directly to detect a secret rotation. Instead we verify the
-            # currently-configured password against the stored hash:
-            #   - If it matches AND the stored hash is a legacy SHA-256 digest,
-            #     upgrade the row to a fresh bcrypt hash.
-            #   - If it doesn't match, the secret has rotated (or the stored
-            #     hash was for a different password) — re-hash and store.
-            stored = row["password_hash"]
-            currently_valid = _verify_password(configured_password, stored)
-            is_legacy = bool(stored) and not stored.startswith("$2")
-            if not currently_valid or is_legacy:
-                conn.execute(
-                    "UPDATE recruiter_auth SET password_hash = ? WHERE username = ?",
-                    (_hash_password(configured_password), DEFAULT_RECRUITER_USERNAME),
-                )
+        freshly_seeded = cur.rowcount > 0
+
+        if not freshly_seeded:
+            # Row already existed — check for secret rotation.
+            row = conn.execute(
+                "SELECT password_hash FROM recruiter_auth WHERE username = ?",
+                (DEFAULT_RECRUITER_USERNAME,),
+            ).fetchone()
+            if row:
+                # bcrypt hashes are non-deterministic, so we can't compare
+                # hashes directly to detect a secret rotation. Instead we
+                # verify the currently-configured password against the
+                # stored hash; mismatch → re-hash, legacy SHA-256 → upgrade.
+                stored = row["password_hash"]
+                currently_valid = _verify_password(configured_password, stored)
+                is_legacy = bool(stored) and not stored.startswith("$2")
+                if not currently_valid or is_legacy:
+                    conn.execute(
+                        "UPDATE recruiter_auth SET password_hash = ? WHERE username = ?",
+                        (_hash_password(configured_password), DEFAULT_RECRUITER_USERNAME),
+                    )
     return freshly_seeded
 
 
