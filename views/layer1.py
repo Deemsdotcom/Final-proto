@@ -325,6 +325,10 @@ def _render_question(
     candidate_id: str, theme: str, theme_idx: int, question_idx: int,
     question, total: int,
 ) -> None:
+    """Render one Layer 1 question with the standardised typography +
+    a sharp header bar (eyebrow + progress rail + countdown timer pill)
+    and a properly-sized question stem.
+    """
     seconds = time_limit_for(theme)
 
     # Tick every second
@@ -337,77 +341,86 @@ def _render_question(
     elapsed = time.time() - started_at
     remaining = max(0, int(seconds - elapsed))
 
-    # Header
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.markdown(f"**Layer 1 — {theme.capitalize()} Reasoning**")
-        st.progress((question_idx) / total, text=f"Question {question_idx + 1} of {total}")
-    with col2:
-        # Color thresholds scale with the time limit
-        green_cut = max(20, seconds // 3)
-        yellow_cut = max(10, seconds // 6)
-        color = "🟢" if remaining > green_cut else ("🟡" if remaining > yellow_cut else "🔴")
-        st.metric("Time remaining", f"{color} {remaining}s")
+    # ── Page chrome + header bar ─────────────────────────────────────────
+    ui.inject_global_styles()
+    ui.header(meta=f"Candidate · {st.session_state.candidate_name}")
 
-    st.divider()
-
-    # Main image (chart, sequence, etc.)
-    if question.chart_path:
-        try:
-            st.image(question.chart_path)
-        except Exception:
-            pass
-
-    st.markdown(f"### {question.question_text}")
-
-    # Optional second image (abstract: A-E option grid)
-    if question.answer_image_path:
-        try:
-            st.image(question.answer_image_path)
-        except Exception:
-            pass
-
-    # Options — dynamic count, support 3/4/5
-    n_opts = len(question.options)
-    letters = ["A", "B", "C", "D", "E"][:n_opts]
-    selection_key = f"l1_{theme}_{question_idx}_selection"
-
-    # Letter-only rendering is reserved for abstract-reasoning items where
-    # the letters are baked into the answer-grid image. Everything else
-    # (including verbal True/False/Cannot Say) shows the option text.
-    use_letter_only = question.locked and question.answer_image_path is not None
-
-    if use_letter_only:
-        display = [f"**{letters[i]}**" for i in range(n_opts)]
-    else:
-        display = [opt for opt in question.options]
-
-    choice_display = st.radio(
-        "Select one:",
-        options=display,
-        key=selection_key,
-        index=None,
-        horizontal=use_letter_only,  # letter-only options look better in a row
+    label = THEME_LABELS[theme]
+    ui.question_progress_bar(
+        idx=question_idx,
+        total=total,
+        remaining=remaining,
+        seconds=seconds,
+        eyebrow_text=(
+            f"Stage 1 of 3 · {label['title']} · Question {question_idx + 1} of {total}"
+        ),
     )
-    chosen_letter = None
-    if choice_display is not None:
-        chosen_letter = letters[display.index(choice_display)]
 
-    # Auto-submit on timeout OR manual submit
-    submit_clicked = st.button(
-        "Submit answer",
-        type="primary",
-        disabled=(chosen_letter is None),
-        key=f"submit_{theme}_{question_idx}",
-    )
-    timed_out = remaining <= 0
+    # ── Question card ────────────────────────────────────────────────────
+    with ui.card(None):
+        # Optional question image (chart/figure/sequence)
+        if question.chart_path:
+            try:
+                st.image(question.chart_path)
+            except Exception:
+                pass
+
+        # Big bold question stem
+        ui.question_stem(question.question_text)
+
+        # Optional second image (abstract: A — E option grid)
+        if question.answer_image_path:
+            try:
+                st.image(question.answer_image_path)
+            except Exception:
+                pass
+
+        # Options — dynamic count, support 3 / 4 / 5
+        n_opts = len(question.options)
+        letters = ["A", "B", "C", "D", "E"][:n_opts]
+        selection_key = f"l1_{theme}_{question_idx}_selection"
+
+        # Letter-only rendering is reserved for abstract-reasoning items
+        # where the letters are baked into the answer-grid image.
+        use_letter_only = question.locked and question.answer_image_path is not None
+
+        if use_letter_only:
+            display = [f"**{letters[i]}**" for i in range(n_opts)]
+        else:
+            display = [opt for opt in question.options]
+
+        choice_display = st.radio(
+            "Select one:",
+            options=display,
+            key=selection_key,
+            index=None,
+            horizontal=use_letter_only,
+            label_visibility="collapsed",
+        )
+        chosen_letter = None
+        if choice_display is not None:
+            chosen_letter = letters[display.index(choice_display)]
+
+        st.markdown(
+            '<div class="cap-q-submit-spacer"></div>',
+            unsafe_allow_html=True,
+        )
+
+        # Auto-submit on timeout OR manual submit
+        submit_clicked = st.button(
+            "Submit answer",
+            type="primary",
+            disabled=(chosen_letter is None),
+            key=f"submit_{theme}_{question_idx}",
+            use_container_width=True,
+        )
+        timed_out = remaining <= 0
 
     if submit_clicked or timed_out:
         _save_and_advance(
             candidate_id, theme, theme_idx, question_idx, question,
             chosen_letter, int(elapsed), timed_out, seconds,
         )
-
 
 def _save_and_advance(
     candidate_id: str, theme: str, theme_idx: int, question_idx: int,

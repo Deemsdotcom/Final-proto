@@ -104,9 +104,9 @@ _GLOBAL_CSS = f"""
     font-weight: 700;
     letter-spacing: -0.01em;
 }}
-.stApp h1 {{ font-size: 2.75rem; line-height: 1.1; margin-bottom: 0.5rem; }}
-.stApp h2 {{ font-size: 2rem;    line-height: 1.15; }}
-.stApp h3 {{ font-size: 1.25rem; line-height: 1.3; }}
+.stApp h1 {{ font-size: var(--cap-text-display); line-height: 1.15; margin-bottom: 0.5rem; }}
+.stApp h2 {{ font-size: var(--cap-text-h2); line-height: 1.2; }}
+.stApp h3 {{ font-size: var(--cap-text-h3); line-height: 1.3; }}
 
 .stApp p, .stApp li, .stApp label {{
     color: {TEXT_PRIMARY};
@@ -1100,3 +1100,44 @@ def editorial_card(sections: list) -> None:
         parts.append('</div>')
     parts.append('</div>')
     st.markdown("".join(parts), unsafe_allow_html=True)
+
+
+def question_progress_bar(idx: int, total: int, remaining: int, seconds: int,
+                          eyebrow_text: str) -> None:
+    """Render the Layer 1 question screen header: eyebrow + horizontal
+    progress rail + countdown timer pill.
+
+    The timer pill changes tone (cyan / amber / red) based on how much
+    time is left vs the per-question budget.
+    """
+    pct = max(0, min(100, int(((idx) / max(total, 1)) * 100)))
+    # Tone thresholds scale with the time limit.
+    if seconds > 0 and remaining > max(20, seconds // 3):
+        tone = "tone-ok"
+    elif remaining > max(10, seconds // 6):
+        tone = "tone-warn"
+    else:
+        tone = "tone-crit"
+
+    html = (
+        '<div class="cap-q-eyebrow">' + _esc(eyebrow_text) + '</div>'
+        '<div class="cap-q-bar">'
+        '<div class="cap-q-progress"><div class="cap-q-progress-fill" '
+        'style="width:' + str(pct) + '%"></div></div>'
+        '<span class="cap-q-timer ' + tone + '">'
+        '<span class="dot"></span>'
+        + str(remaining) + 's left'
+        '</span>'
+        '</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
+def question_stem(text: str) -> None:
+    """Render the question stem in large bold text — the primary content
+    on the question screen.
+    """
+    st.markdown(
+        '<div class="cap-q-stem">' + _esc(text) + '</div>',
+        unsafe_allow_html=True,
+    )
