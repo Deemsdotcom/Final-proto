@@ -36,25 +36,25 @@ THEME_LABELS = {
         "title": "Logical Reasoning",
         "subtitle": "Spot the pattern across rows and columns. Pick the figure that completes the matrix.",
         "options": "A — E",
-        "demo_svg": ui.THEME_DEMO_LOGICAL,
-        "demo_caption": "Example · which option fits the missing cell?",
-        "chips": [
-            ("◆", "Shape changes"),
-            ("↻", "Rotation"),
-            ("+/-", "Add or subtract"),
-            ("123", "Counting"),
-            ("●○", "Color & shading"),
+        "setup_html": (
+            "Each question shows a <strong>3×3 grid of figures</strong> with the "
+            "bottom-right cell missing. The figures change across rows and columns "
+            "according to a hidden rule. Your job is to work out the rule and pick "
+            "the option (A — E) that completes the grid."
+        ),
+        "pattern_tags": [
+            "Shape changes", "Rotation", "Add or subtract",
+            "Counting", "Color &amp; shading",
         ],
         "look_for_note": (
-            "Patterns can combine multiple rules. Most matrices have one "
-            "dominant rule that runs along rows and a second that runs "
-            "along columns."
+            "Patterns can combine multiple rules. Most matrices have one dominant "
+            "rule running along rows and a second along columns."
         ),
         "tips": [
             ("Rows first.", "The pattern often runs more obviously along rows than columns."),
-            ("Eliminate options.", "If you can't see the full pattern, you can usually rule out 2-3 options quickly."),
-            ("Don't overthink.", "After ~30 seconds of being stuck, pick your best guess and move on."),
-            ("Watch the timer.", "75 seconds is plenty if you don't get stuck on one cell."),
+            ("Eliminate options.", "If you can\'t see the full pattern, you can usually rule out 2 — 3 options quickly."),
+            ("Don\'t overthink.", "After about 30 seconds of being stuck, pick your best guess and move on."),
+            ("Watch the timer.", "75 seconds is plenty if you don\'t get stuck on one cell."),
         ],
     },
     "numerical": {
@@ -62,21 +62,22 @@ THEME_LABELS = {
         "title": "Numerical Reasoning",
         "subtitle": "Read a chart or table, then answer a multiple-choice question about the data.",
         "options": "A — D",
-        "demo_svg": ui.THEME_DEMO_NUMERICAL,
-        "demo_caption": "Example · what is the percentage growth from Q1 to Q4?",
-        "chips": [
-            ("%", "Percentages"),
-            (":", "Ratios"),
-            ("↑", "Growth rates"),
-            ("Σ", "Multi-step sums"),
+        "setup_html": (
+            "Each question shows a <strong>chart or table</strong> followed by a "
+            "multiple-choice question about the data. You will work with percentages, "
+            "ratios, growth rates, and multi-step calculations. Use a calculator."
+        ),
+        "pattern_tags": [
+            "Percentages", "Ratios", "Growth rates",
+            "Table reading", "Multi-step sums",
         ],
         "look_for_note": (
-            "Wrong answers are usually plausible-looking traps based on "
-            "misreading axes, units, or which row of the table to use."
+            "Wrong answers are usually plausible-looking traps based on misreading "
+            "axes, units, or which row of the table the question refers to."
         ),
         "tips": [
             ("Read carefully.", "Check axes, units, and which row or column the question refers to."),
-            ("Use the calculator.", "Don't try to do percentages or ratios in your head under time pressure."),
+            ("Use the calculator.", "Don\'t try to do percentages or ratios in your head under time pressure."),
             ("Estimate first.", "A rough estimate helps you spot when an answer choice is way off."),
             ("Skip and return.", "If a calculation is taking too long, guess and move on."),
         ],
@@ -86,26 +87,29 @@ THEME_LABELS = {
         "title": "Verbal Reasoning",
         "subtitle": "Read the passage, then judge the statement: True, False, or Cannot Say.",
         "options": "3 choices",
-        "demo_svg": ui.THEME_DEMO_VERBAL,
-        "demo_caption": "Example · is the statement supported, contradicted, or unaddressed?",
-        "chips": [
-            ("✓", "True · supported by the passage"),
-            ("✗", "False · contradicted by the passage"),
-            ("?", "Cannot Say · not addressed"),
+        "setup_html": (
+            "Each question shows a <strong>short passage</strong> followed by a "
+            "statement. You choose <strong>True</strong> if the statement follows "
+            "from the passage, <strong>False</strong> if it contradicts the passage, "
+            "or <strong>Cannot Say</strong> if the passage does not give you enough "
+            "information to decide."
+        ),
+        "pattern_tags": [
+            "True", "False", "Cannot Say",
         ],
         "look_for_note": (
-            "Use only what the passage says. If outside knowledge or "
-            "common sense would be required to decide, the answer is "
-            "almost always Cannot Say."
+            "Use only what the passage says. If outside knowledge or common sense "
+            "would be required to decide, the answer is almost always Cannot Say."
         ),
         "tips": [
-            ("Stay literal.", "Don't bring outside knowledge or assumptions into the passage."),
-            ("Watch qualifiers.", "Words like 'all', 'always', 'never', 'most' often determine the answer."),
-            ("Default to Cannot Say.", "If the passage doesn't directly address the statement, that's your answer."),
+            ("Stay literal.", "Don\'t bring outside knowledge or assumptions into the passage."),
+            ("Watch qualifiers.", "Words like &lsquo;all&rsquo;, &lsquo;always&rsquo;, &lsquo;never&rsquo;, &lsquo;most&rsquo; often determine the answer."),
+            ("Default to Cannot Say.", "If the passage does not directly address the statement, that is your answer."),
             ("Re-read the relevant sentence.", "Faster than re-reading the whole passage."),
         ],
     },
 }
+
 
 
 
@@ -245,9 +249,10 @@ def _layer_overview() -> None:
 def _theme_intro(theme: str, theme_idx: int) -> None:
     """Per-theme intro shown before the first question of each theme.
 
-    Tighter, more restrained layout: header, eyebrow + title + subtitle,
-    one inline meta line, then a single balanced two-column card (demo
-    on the left, chips + condensed tips on the right). Info banner + CTA.
+    Editorial layout: header, eyebrow, bold title, subtitle with inline
+    meta, then a single wide editorial card with three stacked sections
+    (Setup / Patterns / How to approach), each separated by a thin
+    divider. Info banner + full-width CTA close the page.
     """
     ui.inject_global_styles()
     ui.header(meta=f"Candidate · {st.session_state.candidate_name}")
@@ -259,7 +264,7 @@ def _theme_intro(theme: str, theme_idx: int) -> None:
     ui.eyebrow(f"Stage 1 of 3 · Theme {theme_idx + 1} of {len(THEMES)}")
     ui.page_title(label["title"], label["subtitle"])
 
-    # Inline meta line — replaces the busy 4-card KPI strip
+    # Inline meta line directly under the subtitle
     st.markdown(
         '<div style="color:#A0AECB; font-size:0.95rem; margin:-0.4rem 0 1.4rem 0;">'
         f'<span style="color:#1DB8F2; font-weight:700;">{QUESTIONS_PER_THEME} questions</span>'
@@ -268,24 +273,37 @@ def _theme_intro(theme: str, theme_idx: int) -> None:
         unsafe_allow_html=True,
     )
 
-    # Single balanced two-column card: demo on the left, chips + tips on
-    # the right. Equal-height columns thanks to the global flex cascade.
-    left, right = st.columns(2, gap="medium")
-    with left:
-        with ui.card("What you'll see"):
-            ui.theme_demo(label["demo_svg"], caption=label["demo_caption"])
-    with right:
-        with ui.card("How to approach it"):
-            ui.chip_row(label["chips"])
-            st.markdown(
-                '<div style="color:#A0AECB; font-size:0.92rem; '
-                'line-height:1.5; margin: 0.6rem 0 1rem 0;">'
-                + label["look_for_note"] + '</div>',
-                unsafe_allow_html=True,
-            )
-            ui.chip_list(label["tips"])
+    # Build the three editorial sections using copy from THEME_LABELS
+    tags_html = (
+        '<div class="cap-edit-tags">'
+        + '<span class="tag-sep">&middot;</span>'.join(
+            f'<span>{t}</span>' for t in label["pattern_tags"]
+        )
+        + '</div>'
+        + '<p class="cap-edit-note">' + label["look_for_note"] + '</p>'
+    )
 
-    st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
+    steps_html = '<ol class="cap-edit-steps">' + "".join(
+        f'<li><strong>{head}</strong> {body}</li>' for head, body in label["tips"]
+    ) + '</ol>'
+
+    ui.editorial_card([
+        {
+            "eyebrow": "The setup",
+            "body_html": '<p class="cap-edit-lead">' + label["setup_html"] + '</p>',
+        },
+        {
+            "eyebrow": "Pattern types to look for" if theme == "logical" else
+                       ("What the data looks like" if theme == "numerical" else
+                        "How to read the answer choices"),
+            "body_html": tags_html,
+        },
+        {
+            "eyebrow": "How to approach it",
+            "body_html": steps_html,
+        },
+    ])
+
     ui.info_banner(
         f"{seconds} seconds per question. Time-outs count as incorrect, "
         f"and you cannot revisit a question once it's answered.",

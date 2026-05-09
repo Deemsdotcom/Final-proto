@@ -637,6 +637,101 @@ _GLOBAL_CSS = f"""
     line-height: 1.45;
     font-size: 0.95rem;
 }}
+
+/* ── Editorial card ────────────────────────────────────────────────────────
+   A single wide card with a left cyan accent stripe and several stacked
+   sections separated by thin dividers. Each section starts with a small
+   all-caps cyan eyebrow followed by body content. Matches the slide-deck
+   visual language for the in-app long-form pages.                       */
+.cap-edit-card {{
+    background: {NAVY_CARD};
+    border: 1px solid {NAVY_BORDER};
+    border-left: 3px solid {BLUE_CYAN};
+    border-radius: 8px;
+    padding: 2.1rem 2.4rem 1.8rem 2.4rem;
+    margin: 0.5rem 0 1rem 0;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+}}
+.cap-edit-section {{ padding: 0.2rem 0; }}
+.cap-edit-section + .cap-edit-section {{ padding-top: 1.6rem; }}
+.cap-edit-section h4.cap-edit-eyebrow {{
+    color: {BLUE_CYAN};
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    margin: 0 0 0.85rem 0;
+    font-family: 'Ubuntu', sans-serif;
+}}
+.cap-edit-section .cap-edit-lead {{
+    color: {TEXT_PRIMARY};
+    font-size: 1.05rem;
+    line-height: 1.65;
+    margin: 0 0 0.5rem 0;
+}}
+.cap-edit-section .cap-edit-note {{
+    color: {TEXT_SECONDARY};
+    font-size: 0.95rem;
+    line-height: 1.55;
+    margin: 0.6rem 0 0 0;
+}}
+.cap-edit-divider {{
+    border: none;
+    border-top: 1px solid {NAVY_BORDER};
+    margin: 1.6rem 0 0 0;
+    height: 0;
+}}
+/* Inline pattern-type tags: a horizontal row of plain text separated by
+   small bullets. Keeps the "tags" feel without being chip pills. */
+.cap-edit-tags {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 0.35rem;
+    color: {TEXT_PRIMARY};
+    font-size: 1.05rem;
+    line-height: 1.7;
+    font-weight: 600;
+}}
+.cap-edit-tags .tag-sep {{
+    color: {BLUE_CYAN};
+    opacity: 0.7;
+    margin: 0 0.25rem;
+}}
+/* Numbered list with cyan numerals — used for the "how to approach" tips */
+ol.cap-edit-steps {{
+    counter-reset: capstep;
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}}
+ol.cap-edit-steps li {{
+    counter-increment: capstep;
+    color: {TEXT_PRIMARY};
+    font-size: 1rem;
+    line-height: 1.55;
+    padding: 0.45rem 0 0.45rem 2.4rem;
+    position: relative;
+    border-bottom: 1px solid {NAVY_BORDER};
+}}
+ol.cap-edit-steps li:first-child {{ padding-top: 0.2rem; }}
+ol.cap-edit-steps li:last-child {{ border-bottom: none; padding-bottom: 0.2rem; }}
+ol.cap-edit-steps li::before {{
+    content: counter(capstep, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    top: 0.35rem;
+    color: {BLUE_CYAN};
+    font-weight: 700;
+    font-size: 0.92rem;
+    letter-spacing: 0.05em;
+    width: 2rem;
+    font-variant-numeric: tabular-nums;
+}}
+ol.cap-edit-steps li strong {{
+    color: {TEXT_PRIMARY};
+    font-weight: 700;
+    margin-right: 0.4rem;
+}}
 </style>
 """
 
@@ -980,5 +1075,28 @@ def chip_list(items: list) -> None:
             '<span class="cap-chip-text"><strong>' + _esc(head) + '</strong> ' + _esc(body) + '</span>'
             '</div>'
         )
+    parts.append('</div>')
+    st.markdown("".join(parts), unsafe_allow_html=True)
+
+
+def editorial_card(sections: list) -> None:
+    """Render a wide editorial card with stacked, divider-separated sections.
+
+    `sections` is a list of dicts with keys:
+        eyebrow  (str)        small all-caps section label
+        body_html (str)       inner HTML (rendered as-is, must be safe)
+    Sections render in order, separated by a thin border line. The card
+    has a cyan left accent stripe and matches the slide-deck visual
+    language. Use for in-app long-form pages where the content reads as
+    a short editorial article (theme intros, results explanations, etc.).
+    """
+    parts = ['<div class="cap-edit-card">']
+    for i, sec in enumerate(sections):
+        if i > 0:
+            parts.append('<hr class="cap-edit-divider"/>')
+        parts.append('<div class="cap-edit-section">')
+        parts.append('<h4 class="cap-edit-eyebrow">' + _esc(sec.get("eyebrow", "")) + '</h4>')
+        parts.append(sec.get("body_html", ""))
+        parts.append('</div>')
     parts.append('</div>')
     st.markdown("".join(parts), unsafe_allow_html=True)
