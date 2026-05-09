@@ -553,6 +553,90 @@ _GLOBAL_CSS = f"""
     text-transform: uppercase;
     margin-top: 0.15rem;
 }}
+
+/* ── Theme demo (visual mock-up of a sample question) ──────────────────────
+   A framed canvas inside a card showing what the candidate will actually
+   see during the test. Sits inside an existing card body.            */
+.cap-theme-demo {{
+    background: linear-gradient(180deg, rgba(29,184,242,0.04) 0%, rgba(0,88,171,0.06) 100%);
+    border: 1px solid {NAVY_BORDER};
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-top: 0.5rem;
+    text-align: center;
+}}
+.cap-theme-demo svg {{
+    width: 100%;
+    max-width: 32rem;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}}
+.cap-theme-demo-caption {{
+    color: {TEXT_MUTED};
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 0.85rem;
+}}
+
+/* ── Chip rows (pill-shaped tags inside cards) ────────────────────────── */
+.cap-chips {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.4rem 0;
+}}
+.cap-chip {{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(29,184,242,0.10);
+    border: 1px solid rgba(29,184,242,0.35);
+    color: {TEXT_PRIMARY};
+    border-radius: 999px;
+    padding: 0.32rem 0.85rem 0.32rem 0.7rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.2;
+}}
+.cap-chip-glyph {{
+    color: {BLUE_CYAN};
+    font-weight: 800;
+    font-size: 0.95rem;
+    line-height: 1;
+}}
+.cap-chip-list {{
+    margin: 0.5rem 0;
+}}
+.cap-chip-list .cap-chip-item {{
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid {NAVY_BORDER};
+}}
+.cap-chip-list .cap-chip-item:last-child {{ border-bottom: none; }}
+.cap-chip-list .cap-chip-item .cap-chip-bullet {{
+    color: {BLUE_CYAN};
+    flex-shrink: 0;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: {BLUE_CYAN};
+    margin-top: 0.45rem;
+    box-shadow: 0 0 0 3px rgba(29,184,242,0.18);
+}}
+.cap-chip-list .cap-chip-item .cap-chip-text strong {{
+    color: {TEXT_PRIMARY};
+    font-weight: 700;
+}}
+.cap-chip-list .cap-chip-item .cap-chip-text {{
+    color: {TEXT_SECONDARY};
+    line-height: 1.45;
+    font-size: 0.95rem;
+}}
 </style>
 """
 
@@ -766,3 +850,135 @@ def theme_card(
         '</div>'
     )
     st.markdown(html, unsafe_allow_html=True)
+
+
+# ── Theme demo SVGs ────────────────────────────────────────────────────────
+# Larger illustrative SVGs that mock up what the candidate will see during
+# the test. Used by the Layer 1 theme intros via ui.theme_demo().
+
+THEME_DEMO_LOGICAL = (
+    '<svg viewBox="0 0 360 360" xmlns="http://www.w3.org/2000/svg" fill="none">'
+    # Subtle 3x3 grid lines
+    '<line x1="120" y1="10" x2="120" y2="350" stroke="#28387A" stroke-dasharray="3 4" opacity="0.5"/>'
+    '<line x1="240" y1="10" x2="240" y2="350" stroke="#28387A" stroke-dasharray="3 4" opacity="0.5"/>'
+    '<line x1="10" y1="120" x2="350" y2="120" stroke="#28387A" stroke-dasharray="3 4" opacity="0.5"/>'
+    '<line x1="10" y1="240" x2="350" y2="240" stroke="#28387A" stroke-dasharray="3 4" opacity="0.5"/>'
+    # Row 1 — open shapes
+    '<polygon points="60,40 90,90 30,90" stroke="#1DB8F2" stroke-width="2.5"/>'
+    '<rect x="150" y="40" width="60" height="50" stroke="#1DB8F2" stroke-width="2.5"/>'
+    '<circle cx="300" cy="65" r="28" stroke="#1DB8F2" stroke-width="2.5"/>'
+    # Row 2 — filled shapes
+    '<polygon points="60,160 90,210 30,210" fill="#1DB8F2"/>'
+    '<rect x="150" y="160" width="60" height="50" fill="#1DB8F2"/>'
+    '<circle cx="300" cy="185" r="28" fill="#1DB8F2"/>'
+    # Row 3 — half-filled
+    '<polygon points="60,280 90,330 30,330" stroke="#1DB8F2" stroke-width="2.5" fill="#1DB8F2" fill-opacity="0.45"/>'
+    '<rect x="150" y="280" width="60" height="50" stroke="#1DB8F2" stroke-width="2.5" fill="#1DB8F2" fill-opacity="0.45"/>'
+    # Missing cell with question mark
+    '<rect x="262" y="262" width="76" height="76" rx="8" stroke="#1DB8F2" stroke-width="2.5" stroke-dasharray="6 5"/>'
+    '<text x="300" y="318" text-anchor="middle" font-size="48" font-family="Ubuntu, sans-serif" font-weight="700" fill="#1DB8F2">?</text>'
+    '</svg>'
+)
+
+THEME_DEMO_NUMERICAL = (
+    '<svg viewBox="0 0 400 240" xmlns="http://www.w3.org/2000/svg" fill="none">'
+    # Y-axis label
+    '<text x="14" y="22" font-size="11" font-family="Ubuntu, sans-serif" font-weight="700" letter-spacing="2" fill="#1DB8F2">REVENUE · CHF M</text>'
+    # Y axis grid lines
+    '<line x1="40" y1="50" x2="380" y2="50" stroke="#28387A" stroke-dasharray="2 4" opacity="0.4"/>'
+    '<line x1="40" y1="100" x2="380" y2="100" stroke="#28387A" stroke-dasharray="2 4" opacity="0.4"/>'
+    '<line x1="40" y1="150" x2="380" y2="150" stroke="#28387A" stroke-dasharray="2 4" opacity="0.4"/>'
+    # Bars (Q1-Q4)
+    '<rect x="60"  y="120" width="50" height="80"  rx="2" fill="#1DB8F2" fill-opacity="0.55"/>'
+    '<rect x="140" y="80"  width="50" height="120" rx="2" fill="#1DB8F2" fill-opacity="0.7"/>'
+    '<rect x="220" y="100" width="50" height="100" rx="2" fill="#1DB8F2" fill-opacity="0.7"/>'
+    '<rect x="300" y="40"  width="50" height="160" rx="2" fill="#1DB8F2"/>'
+    # X axis
+    '<line x1="40" y1="200" x2="380" y2="200" stroke="#A0AECB" stroke-width="1.5"/>'
+    # X axis labels
+    '<text x="85"  y="218" font-size="11" font-family="Ubuntu, sans-serif" fill="#A0AECB" text-anchor="middle">Q1</text>'
+    '<text x="165" y="218" font-size="11" font-family="Ubuntu, sans-serif" fill="#A0AECB" text-anchor="middle">Q2</text>'
+    '<text x="245" y="218" font-size="11" font-family="Ubuntu, sans-serif" fill="#A0AECB" text-anchor="middle">Q3</text>'
+    '<text x="325" y="218" font-size="11" font-family="Ubuntu, sans-serif" fill="#A0AECB" text-anchor="middle">Q4</text>'
+    # Question pill
+    '<rect x="40" y="232" width="320" height="0" stroke="#28387A"/>'
+    '</svg>'
+)
+
+THEME_DEMO_VERBAL = (
+    '<svg viewBox="0 0 400 240" xmlns="http://www.w3.org/2000/svg" fill="none">'
+    # Passage box (mock document)
+    '<rect x="10" y="10" width="380" height="115" rx="8" fill="#1F2D52" stroke="#28387A"/>'
+    # Passage label
+    '<text x="22" y="32" font-size="10" font-family="Ubuntu, sans-serif" font-weight="700" letter-spacing="2" fill="#A0AECB">PASSAGE</text>'
+    # Text lines
+    '<rect x="22" y="44" width="356" height="4" rx="2" fill="#A0AECB" opacity="0.55"/>'
+    '<rect x="22" y="56" width="338" height="4" rx="2" fill="#A0AECB" opacity="0.55"/>'
+    '<rect x="22" y="68" width="356" height="4" rx="2" fill="#A0AECB" opacity="0.55"/>'
+    '<rect x="22" y="80" width="280" height="4" rx="2" fill="#A0AECB" opacity="0.55"/>'
+    '<rect x="22" y="92" width="356" height="4" rx="2" fill="#A0AECB" opacity="0.55"/>'
+    '<rect x="22" y="104" width="220" height="4" rx="2" fill="#A0AECB" opacity="0.55"/>'
+    # Statement label
+    '<text x="10" y="148" font-size="10" font-family="Ubuntu, sans-serif" font-weight="700" letter-spacing="2" fill="#1DB8F2">STATEMENT</text>'
+    # Statement text (brighter)
+    '<rect x="10" y="158" width="360" height="5" rx="2" fill="#FFFFFF" opacity="0.85"/>'
+    '<rect x="10" y="170" width="240" height="5" rx="2" fill="#FFFFFF" opacity="0.85"/>'
+    # Answer pills
+    '<rect x="10" y="200" width="78" height="32" rx="16" fill="rgba(29,184,242,0.08)" stroke="#1DB8F2" stroke-width="1.5"/>'
+    '<text x="49" y="220" font-size="11" font-family="Ubuntu, sans-serif" font-weight="700" letter-spacing="1.5" fill="#1DB8F2" text-anchor="middle">TRUE</text>'
+    '<rect x="98" y="200" width="78" height="32" rx="16" fill="rgba(29,184,242,0.08)" stroke="#1DB8F2" stroke-width="1.5"/>'
+    '<text x="137" y="220" font-size="11" font-family="Ubuntu, sans-serif" font-weight="700" letter-spacing="1.5" fill="#1DB8F2" text-anchor="middle">FALSE</text>'
+    '<rect x="186" y="200" width="138" height="32" rx="16" fill="rgba(29,184,242,0.08)" stroke="#1DB8F2" stroke-width="1.5"/>'
+    '<text x="255" y="220" font-size="11" font-family="Ubuntu, sans-serif" font-weight="700" letter-spacing="1.5" fill="#1DB8F2" text-anchor="middle">CANNOT SAY</text>'
+    '</svg>'
+)
+
+
+def theme_demo(svg: str, caption: Optional[str] = None) -> None:
+    """Render a framed visual demo (SVG mock-up) inside a card body.
+    Used on Layer 1 theme intros to show candidates an example of the
+    question type they're about to see.
+    """
+    parts = [
+        '<div class="cap-theme-demo">',
+        svg,
+    ]
+    if caption:
+        parts.append('<div class="cap-theme-demo-caption">' + _esc(caption) + '</div>')
+    parts.append('</div>')
+    st.markdown("".join(parts), unsafe_allow_html=True)
+
+
+def chip_row(items: list) -> None:
+    """Render a row of pill-shaped tags. items: list of (glyph, label).
+    The glyph is a small cyan symbol (e.g. arrow, ↻, 1·2·3) shown to the
+    left of the label inside each chip.
+    """
+    parts = ['<div class="cap-chips">']
+    for glyph, label in items:
+        parts.append(
+            '<span class="cap-chip">'
+            '<span class="cap-chip-glyph">' + _esc(glyph) + '</span>'
+            '<span>' + _esc(label) + '</span>'
+            '</span>'
+        )
+    parts.append('</div>')
+    st.markdown("".join(parts), unsafe_allow_html=True)
+
+
+def chip_list(items: list) -> None:
+    """Vertical bullet-style list with strong-tagged head + body.
+    items: list of (head, body) tuples — head appears bold, body in
+    muted text body. Use for short tip lists where each tip has a
+    one-word strategy verb followed by a sentence of detail.
+    """
+    parts = ['<div class="cap-chip-list">']
+    for head, body in items:
+        parts.append(
+            '<div class="cap-chip-item">'
+            '<span class="cap-chip-bullet"></span>'
+            '<span class="cap-chip-text"><strong>' + _esc(head) + '</strong> ' + _esc(body) + '</span>'
+            '</div>'
+        )
+    parts.append('</div>')
+    st.markdown("".join(parts), unsafe_allow_html=True)

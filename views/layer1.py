@@ -27,6 +27,87 @@ from database import db
 from . import _design as ui
 from .state import advance_stage
 
+# Per-theme content for _theme_intro. Keeping it module-level so the
+# render function reads as a clean layout pipeline, and so the copy can
+# be edited without touching layout code.
+THEME_LABELS = {
+    "logical": {
+        "short": "Logical",
+        "title": "Logical Reasoning",
+        "subtitle": "Spot the pattern across rows and columns. Pick the figure that completes the matrix.",
+        "options": "A — E",
+        "demo_svg": ui.THEME_DEMO_LOGICAL,
+        "demo_caption": "Example · which option fits the missing cell?",
+        "chips": [
+            ("◆", "Shape changes"),
+            ("↻", "Rotation"),
+            ("+/-", "Add or subtract"),
+            ("123", "Counting"),
+            ("●○", "Color & shading"),
+        ],
+        "look_for_note": (
+            "Patterns can combine multiple rules. Most matrices have one "
+            "dominant rule that runs along rows and a second that runs "
+            "along columns."
+        ),
+        "tips": [
+            ("Rows first.", "The pattern often runs more obviously along rows than columns."),
+            ("Eliminate options.", "If you can't see the full pattern, you can usually rule out 2-3 options quickly."),
+            ("Don't overthink.", "After ~30 seconds of being stuck, pick your best guess and move on."),
+            ("Watch the timer.", "75 seconds is plenty if you don't get stuck on one cell."),
+        ],
+    },
+    "numerical": {
+        "short": "Numerical",
+        "title": "Numerical Reasoning",
+        "subtitle": "Read a chart or table, then answer a multiple-choice question about the data.",
+        "options": "A — D",
+        "demo_svg": ui.THEME_DEMO_NUMERICAL,
+        "demo_caption": "Example · what is the percentage growth from Q1 to Q4?",
+        "chips": [
+            ("%", "Percentages"),
+            (":", "Ratios"),
+            ("↑", "Growth rates"),
+            ("Σ", "Multi-step sums"),
+        ],
+        "look_for_note": (
+            "Wrong answers are usually plausible-looking traps based on "
+            "misreading axes, units, or which row of the table to use."
+        ),
+        "tips": [
+            ("Read carefully.", "Check axes, units, and which row or column the question refers to."),
+            ("Use the calculator.", "Don't try to do percentages or ratios in your head under time pressure."),
+            ("Estimate first.", "A rough estimate helps you spot when an answer choice is way off."),
+            ("Skip and return.", "If a calculation is taking too long, guess and move on."),
+        ],
+    },
+    "verbal": {
+        "short": "Verbal",
+        "title": "Verbal Reasoning",
+        "subtitle": "Read the passage, then judge the statement: True, False, or Cannot Say.",
+        "options": "3 choices",
+        "demo_svg": ui.THEME_DEMO_VERBAL,
+        "demo_caption": "Example · is the statement supported, contradicted, or unaddressed?",
+        "chips": [
+            ("✓", "True · supported by the passage"),
+            ("✗", "False · contradicted by the passage"),
+            ("?", "Cannot Say · not addressed"),
+        ],
+        "look_for_note": (
+            "Use only what the passage says. If outside knowledge or "
+            "common sense would be required to decide, the answer is "
+            "almost always Cannot Say."
+        ),
+        "tips": [
+            ("Stay literal.", "Don't bring outside knowledge or assumptions into the passage."),
+            ("Watch qualifiers.", "Words like 'all', 'always', 'never', 'most' often determine the answer."),
+            ("Default to Cannot Say.", "If the passage doesn't directly address the statement, that's your answer."),
+            ("Re-read the relevant sentence.", "Faster than re-reading the whole passage."),
+        ],
+    },
+}
+
+
 
 def render() -> None:
     candidate_id = st.session_state.candidate_id
@@ -162,91 +243,72 @@ def _layer_overview() -> None:
 
 
 def _theme_intro(theme: str, theme_idx: int) -> None:
-    st.title(f"Layer 1 — {theme.capitalize()} Reasoning")
-    st.caption(f"Theme {theme_idx + 1} of {len(THEMES)}")
+    """Per-theme intro shown before the first question of each theme.
+
+    Layout: header + eyebrow + bold title + KPI strip + a wide visual
+    demo card (showing what the candidate is about to see) alongside a
+    "What to look for" chips card, then strategy tips, info banner, CTA.
+    """
+    ui.inject_global_styles()
+    ui.header(meta=f"Candidate · {st.session_state.candidate_name}")
 
     seconds = time_limit_for(theme)
+    label = THEME_LABELS[theme]
 
-    if theme == "logical":
-        st.markdown(
-            f"""
-            ### Matrix reasoning
+    ui.eyebrow(f"Stage 1 of 3 · Theme {theme_idx + 1} of {len(THEMES)}")
+    ui.page_title(label["title"], label["subtitle"])
 
-            Each question shows a **3×3 grid of figures** with the
-            bottom-right cell missing. The figures change across rows and
-            columns according to a pattern — your job is to work out the
-            pattern and pick the option (A–E) that completes the grid.
+    # ── KPI strip ────────────────────────────────────────────────────────
+    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
+    k1, k2, k3, k4 = st.columns(4, gap="small")
+    with k1:
+        ui.metric(str(QUESTIONS_PER_THEME), "Questions")
+    with k2:
+        ui.metric(f"{seconds} s", "Per question")
+    with k3:
+        ui.metric(label["options"], "Options")
+    with k4:
+        ui.metric(f"~{(seconds * QUESTIONS_PER_THEME) // 60} min", "Total time")
 
-            ### How the patterns work
+    st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
 
-            Patterns can involve any combination of:
-            - **Shape changes** — squares to triangles, open to filled
-            - **Rotation** — figures turning 45° or 90° each step
-            - **Addition or subtraction** — elements appearing or
-              disappearing across rows or columns
-            - **Counting** — number of dots, lines, or shapes increasing
-              or decreasing
-            - **Color or shading** — alternating, inverting, or combining
+    # ── Demo + What to look for ──────────────────────────────────────────
+    left, right = st.columns([3, 2], gap="medium")
+    with left:
+        with ui.card("What you'll see"):
+            ui.theme_demo(label["demo_svg"], caption=label["demo_caption"])
+    with right:
+        with ui.card("What to look for"):
+            ui.chip_row(label["chips"])
+            st.markdown(
+                f'<div style="color:var(--cap-muted, #A0AECB); font-size:0.92rem; '
+                f'line-height:1.5; margin-top:0.6rem;">{label["look_for_note"]}</div>',
+                unsafe_allow_html=True,
+            )
 
-            ### Tips before you start
+    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
 
-            - **Look at rows first**, then columns. The pattern often runs
-              in one direction more obviously than the other.
-            - **Eliminate impossible options.** Even if you can't see the
-              full pattern, you can usually rule out 2–3 options quickly.
-            - **Don't overthink it.** If you've stared for 30 seconds and
-              nothing clicks, pick your best guess and move on. Wrong
-              answers cost the same as no answer, but no answer is
-              guaranteed wrong.
-            - **Watch the timer.** {seconds} seconds is enough for most
-              questions if you don't get stuck.
+    # ── Strategy tips ────────────────────────────────────────────────────
+    with ui.card("Strategy tips"):
+        ui.chip_list(label["tips"])
 
-            **Time limit: {seconds} seconds per question.**
-            """
-        )
-    elif theme == "numerical":
-        st.markdown(
-            f"""
-            ### Numerical reasoning
+    st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+    ui.info_banner(
+        f"{seconds} seconds per question. Time-outs count as incorrect, "
+        f"and you cannot revisit a question once it's answered.",
+        icon="ℹ",
+    )
+    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
 
-            Each question shows a **chart or table**, followed by a
-            multiple-choice question about the data. You'll need to do
-            arithmetic on percentages, ratios, growth rates, and similar.
-
-            Use your calculator. Read the question carefully — the wrong
-            answers are usually plausible-looking traps based on
-            misreading axes, units, or which row/column to use.
-
-            **Time limit: {seconds} seconds per question.**
-            """
-        )
-    elif theme == "verbal":
-        st.markdown(
-            f"""
-            ### Verbal reasoning
-
-            Each question shows a **short passage** followed by a
-            **statement**. You'll choose one of three options:
-
-            - **True** — the statement follows logically from the passage.
-            - **False** — the statement contradicts the passage.
-            - **Cannot Say** — the passage doesn't give you enough
-              information to decide either way.
-
-            **Important:** answer based only on what the passage says. Don't
-            use outside knowledge, common sense, or assumptions about what
-            "should" be true. If the passage doesn't address it directly,
-            the answer is almost always **Cannot Say**.
-
-            **Time limit: {seconds} seconds per question.**
-            """
-        )
-
-    if st.button(f"Begin {theme.capitalize()} Theme", type="primary"):
+    if st.button(
+        f"Begin {label['short']} Theme",
+        type="primary",
+        use_container_width=True,
+        key=f"l1_theme_{theme}_begin",
+    ):
         st.session_state[f"l1_{theme}_started"] = True
         st.session_state.l1_question_started_at = time.time()
         st.rerun()
-
 
 def _render_question(
     candidate_id: str, theme: str, theme_idx: int, question_idx: int,
