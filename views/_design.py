@@ -577,17 +577,22 @@ def journey_timeline(items: list) -> None:
     bold title, and description rendered to the right. Use for the
     welcome page (3 layers) or anywhere else a sequenced journey is
     clearer than a horizontal stat strip or card grid.
+
+    Implementation note: the inner HTML is emitted as a single line with
+    no leading whitespace. Indented multi-line HTML inside a triple-quoted
+    f-string makes Streamlit's markdown parser treat blocks after the
+    first as 4-space-indented code blocks, which renders the raw HTML as
+    text instead of styled elements.
     """
-    rows = []
+    parts = []
     for item in items:
-        rows.append(
-            f"""
-            <div class="cap-station">
-              <div class="cap-station-circle">{_esc(item.get("num", ""))}</div>
-              <div class="cap-station-meta">{_esc(item.get("meta", ""))}</div>
-              <div class="cap-station-title">{_esc(item.get("title", ""))}</div>
-              <div class="cap-station-desc">{_esc(item.get("desc", ""))}</div>
-            </div>
-            """
+        parts.append(
+            '<div class="cap-station">'
+            '<div class="cap-station-circle">' + _esc(item.get("num", "")) + '</div>'
+            '<div class="cap-station-meta">' + _esc(item.get("meta", "")) + '</div>'
+            '<div class="cap-station-title">' + _esc(item.get("title", "")) + '</div>'
+            '<div class="cap-station-desc">' + _esc(item.get("desc", "")) + '</div>'
+            '</div>'
         )
-    st.markdown(f'<div class="cap-journey">{"".join(rows)}</div>', unsafe_allow_html=True)
+    html = '<div class="cap-journey">' + "".join(parts) + '</div>'
+    st.markdown(html, unsafe_allow_html=True)
