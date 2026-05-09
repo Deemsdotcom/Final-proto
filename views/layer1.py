@@ -245,54 +245,47 @@ def _layer_overview() -> None:
 def _theme_intro(theme: str, theme_idx: int) -> None:
     """Per-theme intro shown before the first question of each theme.
 
-    Layout: header + eyebrow + bold title + KPI strip + a wide visual
-    demo card (showing what the candidate is about to see) alongside a
-    "What to look for" chips card, then strategy tips, info banner, CTA.
+    Tighter, more restrained layout: header, eyebrow + title + subtitle,
+    one inline meta line, then a single balanced two-column card (demo
+    on the left, chips + condensed tips on the right). Info banner + CTA.
     """
     ui.inject_global_styles()
     ui.header(meta=f"Candidate · {st.session_state.candidate_name}")
 
     seconds = time_limit_for(theme)
     label = THEME_LABELS[theme]
+    total_min = (seconds * QUESTIONS_PER_THEME + 30) // 60
 
     ui.eyebrow(f"Stage 1 of 3 · Theme {theme_idx + 1} of {len(THEMES)}")
     ui.page_title(label["title"], label["subtitle"])
 
-    # ── KPI strip ────────────────────────────────────────────────────────
-    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
-    k1, k2, k3, k4 = st.columns(4, gap="small")
-    with k1:
-        ui.metric(str(QUESTIONS_PER_THEME), "Questions")
-    with k2:
-        ui.metric(f"{seconds} s", "Per question")
-    with k3:
-        ui.metric(label["options"], "Options")
-    with k4:
-        ui.metric(f"~{(seconds * QUESTIONS_PER_THEME) // 60} min", "Total time")
+    # Inline meta line — replaces the busy 4-card KPI strip
+    st.markdown(
+        '<div style="color:#A0AECB; font-size:0.95rem; margin:-0.4rem 0 1.4rem 0;">'
+        f'<span style="color:#1DB8F2; font-weight:700;">{QUESTIONS_PER_THEME} questions</span>'
+        f' &middot; {seconds} seconds each &middot; {label["options"]} options &middot; ~{total_min} min total'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
-    st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
-
-    # ── Demo + What to look for ──────────────────────────────────────────
-    left, right = st.columns([3, 2], gap="medium")
+    # Single balanced two-column card: demo on the left, chips + tips on
+    # the right. Equal-height columns thanks to the global flex cascade.
+    left, right = st.columns(2, gap="medium")
     with left:
         with ui.card("What you'll see"):
             ui.theme_demo(label["demo_svg"], caption=label["demo_caption"])
     with right:
-        with ui.card("What to look for"):
+        with ui.card("How to approach it"):
             ui.chip_row(label["chips"])
             st.markdown(
-                f'<div style="color:var(--cap-muted, #A0AECB); font-size:0.92rem; '
-                f'line-height:1.5; margin-top:0.6rem;">{label["look_for_note"]}</div>',
+                '<div style="color:#A0AECB; font-size:0.92rem; '
+                'line-height:1.5; margin: 0.6rem 0 1rem 0;">'
+                + label["look_for_note"] + '</div>',
                 unsafe_allow_html=True,
             )
+            ui.chip_list(label["tips"])
 
-    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
-
-    # ── Strategy tips ────────────────────────────────────────────────────
-    with ui.card("Strategy tips"):
-        ui.chip_list(label["tips"])
-
-    st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
     ui.info_banner(
         f"{seconds} seconds per question. Time-outs count as incorrect, "
         f"and you cannot revisit a question once it's answered.",
