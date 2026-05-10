@@ -44,6 +44,41 @@ def _dev_sidebar() -> None:
     if st.query_params.get("dev") != "1":
         return
 
+    # Override the global CSS that hides the toolbar (and therefore the
+    # sidebar-toggle button) so the sidebar is always reachable here.
+    # Also render a small fixed "DEV MODE" badge so it is obvious the
+    # param took effect.
+    st.markdown(
+        """
+        <style>
+        .stApp [data-testid="stToolbar"] {
+            visibility: visible !important;
+            height: auto !important;
+        }
+        .stApp [data-testid="stSidebar"] {
+            display: block !important;
+        }
+        .cap-dev-badge {
+            position: fixed;
+            top: 0.6rem;
+            right: 1rem;
+            background: #1DB8F2;
+            color: #121A38;
+            font-family: Ubuntu, sans-serif;
+            font-weight: 700;
+            font-size: 0.78rem;
+            letter-spacing: 0.18em;
+            padding: 0.3rem 0.7rem;
+            border-radius: 999px;
+            z-index: 9999;
+            box-shadow: 0 4px 16px rgba(29,184,242,0.4);
+        }
+        </style>
+        <div class="cap-dev-badge">DEV MODE</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     with st.sidebar:
         st.markdown("### Dev navigation")
         st.caption("Visible because URL has ?dev=1. Append/remove the param to toggle.")
