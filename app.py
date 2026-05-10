@@ -5,10 +5,6 @@ Everything kicks off from here.
 
 Run with:
     streamlit run app.py
-
-Dev mode: append ?dev=1 to the URL to reveal a sidebar with one-click
-stage navigation. Useful for testing UI changes without going through
-the full assessment each time.
 """
 
 from __future__ import annotations
@@ -31,165 +27,151 @@ from views import (
 from views.state import init_session_state, reset_candidate_state
 
 
-# ── Dev sidebar ──────────────────────────────────────────────────────────
-# Visible only when ?dev=1 is in the URL. Lets the developer set up a
-# test candidate in one click and jump straight to any stage of the
-# assessment, including specific Layer 1 theme intros and question
-# screens. Candidates never see this because they don't add the param.
-
 THEMES = ["logical", "numerical", "verbal"]
 
 
-def _dev_sidebar() -> None:
-    if st.query_params.get("dev") != "1":
-        return
+# ── Top nav bar (prototype-mode) ──────────────────────────────────────────
+# Always-visible navigation strip rendered at the very top of every page.
+# Each button jumps directly to that stage. Designed for prototype testing
+# so the team can hop around without clicking through the full flow each
+# time. Strip this function (or wrap it back in a ?dev=1 gate) before
+# shipping the assessment to real candidates.
 
-    # Override the global CSS that hides the toolbar (and therefore the
-    # sidebar-toggle button) so the sidebar is always reachable here.
-    # Also render a small fixed "DEV MODE" badge so it is obvious the
-    # param took effect.
+def _nav_bar() -> None:
+    # Brand-aligned styling: dark navy strip with cyan accents matching
+    # the rest of the app. Sits ABOVE the page header that each view
+    # renders, so it's always the first thing on screen.
     st.markdown(
         """
         <style>
-        .stApp [data-testid="stToolbar"] {
-            visibility: visible !important;
-            height: auto !important;
-        }
-        .stApp [data-testid="stSidebar"] {
-            display: block !important;
-        }
-        .cap-dev-badge {
-            position: fixed;
-            top: 0.6rem;
-            right: 1rem;
-            background: #1DB8F2;
-            color: #121A38;
+        .cap-nav-bar {
+            background: #15233E;
+            border: 1px solid #28387A;
+            border-radius: 8px;
+            padding: 0.4rem 0.6rem;
+            margin: 0 0 1rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
             font-family: Ubuntu, sans-serif;
-            font-weight: 700;
+        }
+        .cap-nav-label {
+            color: #1DB8F2;
             font-size: 0.78rem;
+            font-weight: 700;
             letter-spacing: 0.18em;
-            padding: 0.3rem 0.7rem;
-            border-radius: 999px;
-            z-index: 9999;
-            box-shadow: 0 4px 16px rgba(29,184,242,0.4);
+            text-transform: uppercase;
+            margin-right: 0.5rem;
+            white-space: nowrap;
+        }
+        /* Make the nav buttons themselves compact */
+        .cap-nav-row .stButton > button {
+            width: 100%;
+            padding: 0.4rem 0.5rem !important;
+            font-size: 0.85rem !important;
+            font-weight: 600 !important;
+            min-height: auto !important;
+            border-radius: 6px !important;
         }
         </style>
-        <div class="cap-dev-badge">DEV MODE</div>
+        <div class="cap-nav-bar">
+            <span class="cap-nav-label">Quick nav</span>
+        </div>
         """,
         unsafe_allow_html=True,
     )
 
-    with st.sidebar:
-        st.markdown("### Dev navigation")
-        st.caption("Visible because URL has ?dev=1. Append/remove the param to toggle.")
-
-        # ── Test candidate setup ─────────────────────────────────────────
-        if not st.session_state.get("candidate_id"):
+    # ── Test candidate setup row (only when no candidate yet) ────────────
+    if not st.session_state.get("candidate_id"):
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.caption(
+                "No candidate yet — create a test one to enable stage jumps."
+            )
+        with c2:
             if st.button(
-                "Create test candidate", use_container_width=True,
-                key="dev_make_candidate",
+                "Create test candidate",
+                use_container_width=True, key="nav_make_candidate",
+                type="primary",
             ):
                 cid = str(uuid.uuid4())
-                db.create_candidate(cid, "Dev Tester", f"dev+{cid[:8]}@test.local")
+                db.create_candidate(
+                    cid, "Dev Tester", f"dev+{cid[:8]}@test.local"
+                )
                 st.session_state.mode = "candidate"
                 st.session_state.candidate_id = cid
                 st.session_state.candidate_name = "Dev Tester"
                 st.session_state.candidate_email = f"dev+{cid[:8]}@test.local"
                 st.session_state.stage = "intro"
                 st.rerun()
-        else:
-            st.caption(
-                f"Candidate: **{st.session_state.candidate_name}** · "
-                f"`{(st.session_state.candidate_id or '')[:8]}...`"
-            )
+        st.markdown("---")
+        return  # no point rendering the rest until a candidate exists
+
+    # ── Main page-jump row ───────────────────────────────────────────────
+    st.markdown('<div class="cap-nav-row">', unsafe_allow_html=True)
+    cols = st.columns(8)
+    pages = [
+        ("Landing",         "landing"),
+        ("Intro",           "intro"),
+        ("Layer 1",         "layer1"),
+        ("Layer 2",         "layer2"),
+        ("Layer 3",         "layer3"),
+        ("Results",         "results"),
+        ("Recruiter",       "recruiter"),
+        ("Reset",           "reset"),
+    ]
+    for i, (label, target) in enumerate(pages):
+        with cols[i]:
+            if st.button(label, key=f"nav_{target}", use_container_width=True):
+                _jump_to(target)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # ── Layer 1 sub-jumps (themes) ───────────────────────────────────────
+    st.caption("Layer 1 themes")
+    cols = st.columns(6)
+    sub_pages = []
+    for theme in THEMES:
+        sub_pages.append((f"{theme.title()} intro", theme, "intro"))
+        sub_pages.append((f"{theme.title()} Q1",    theme, "q1"))
+    for i, (label, theme, kind) in enumerate(sub_pages):
+        with cols[i]:
             if st.button(
-                "Reset to landing", use_container_width=True,
-                key="dev_reset",
+                label, key=f"nav_l1_{theme}_{kind}", use_container_width=True,
             ):
-                reset_candidate_state()
-                st.rerun()
+                _jump_layer1(theme, kind)
+    st.markdown("---")
 
-        st.divider()
-        st.markdown("**Jump to stage**")
 
-        # Generic stage jumps
-        for label, stage in [
-            ("Candidate intro", "intro"),
-            ("Layer 1 — overview", "layer1"),
-            ("Layer 2 — simulation", "layer2"),
-            ("Layer 3 — interview", "layer3"),
-            ("Results", "results"),
-        ]:
-            if st.button(
-                label, key=f"dev_jump_{stage}", use_container_width=True,
-                disabled=not st.session_state.get("candidate_id"),
-            ):
-                st.session_state.stage = stage
-                if stage == "layer1":
-                    # Show the overview, not skip past it.
-                    st.session_state.l1_overview_seen = False
-                if st.session_state.candidate_id:
-                    db.set_stage(st.session_state.candidate_id, stage)
-                st.rerun()
+def _jump_to(target: str) -> None:
+    if target == "landing":
+        reset_candidate_state()
+    elif target == "recruiter":
+        st.session_state.mode = "recruiter"
+        st.session_state.recruiter_authed = True
+        st.session_state.stage = "recruiter_dashboard"
+    elif target == "reset":
+        reset_candidate_state()
+    else:
+        st.session_state.stage = target
+        if target == "layer1":
+            st.session_state.l1_overview_seen = False
+        if st.session_state.candidate_id:
+            db.set_stage(st.session_state.candidate_id, target)
+    st.rerun()
 
-        # Recruiter dashboard — special, doesn't need a candidate
-        st.divider()
-        if st.button(
-            "Recruiter dashboard", use_container_width=True,
-            key="dev_jump_recruiter",
-        ):
-            st.session_state.mode = "recruiter"
-            st.session_state.recruiter_authed = True
-            st.session_state.stage = "recruiter_dashboard"
-            st.rerun()
 
-        # ── Layer 1 sub-navigation ──────────────────────────────────────
-        st.divider()
-        st.markdown("**Layer 1 sub-pages**")
-
-        if st.button(
-            "Skip overview → first theme intro",
-            use_container_width=True, key="dev_l1_skip_overview",
-            disabled=not st.session_state.get("candidate_id"),
-        ):
-            st.session_state.stage = "layer1"
-            st.session_state.l1_overview_seen = True
-            st.session_state.l1_theme_idx = 0
-            st.session_state.l1_question_idx = 0
-            for t in THEMES:
-                st.session_state.pop(f"l1_{t}_started", None)
-            st.rerun()
-
-        for idx, theme in enumerate(THEMES):
-            cols = st.sidebar.columns(2)
-            with cols[0]:
-                if st.button(
-                    f"{theme.title()} intro",
-                    key=f"dev_l1_intro_{theme}",
-                    use_container_width=True,
-                    disabled=not st.session_state.get("candidate_id"),
-                ):
-                    st.session_state.stage = "layer1"
-                    st.session_state.l1_overview_seen = True
-                    st.session_state.l1_theme_idx = idx
-                    st.session_state.l1_question_idx = 0
-                    for t in THEMES:
-                        st.session_state.pop(f"l1_{t}_started", None)
-                    st.rerun()
-            with cols[1]:
-                if st.button(
-                    f"{theme.title()} Q1",
-                    key=f"dev_l1_q1_{theme}",
-                    use_container_width=True,
-                    disabled=not st.session_state.get("candidate_id"),
-                ):
-                    st.session_state.stage = "layer1"
-                    st.session_state.l1_overview_seen = True
-                    st.session_state.l1_theme_idx = idx
-                    st.session_state.l1_question_idx = 0
-                    st.session_state[f"l1_{theme}_started"] = True
-                    st.session_state.l1_question_started_at = time.time()
-                    st.rerun()
+def _jump_layer1(theme: str, kind: str) -> None:
+    idx = THEMES.index(theme)
+    st.session_state.stage = "layer1"
+    st.session_state.l1_overview_seen = True
+    st.session_state.l1_theme_idx = idx
+    st.session_state.l1_question_idx = 0
+    for t in THEMES:
+        st.session_state.pop(f"l1_{t}_started", None)
+    if kind == "q1":
+        st.session_state[f"l1_{theme}_started"] = True
+        st.session_state.l1_question_started_at = time.time()
+    st.rerun()
 
 
 # ── Main ─────────────────────────────────────────────────────────────────
@@ -200,9 +182,7 @@ def main() -> None:
         page_title="Capgemini Invent — Consulting Assessment",
         page_icon="📊",
         layout="wide",
-        initial_sidebar_state=(
-            "expanded" if st.query_params.get("dev") == "1" else "collapsed"
-        ),
+        initial_sidebar_state="collapsed",
     )
 
     # Initialize DB once per process
@@ -217,8 +197,9 @@ def main() -> None:
 
     init_session_state()
 
-    # Dev navigation sidebar (no-op when ?dev=1 is not in the URL)
-    _dev_sidebar()
+    # ALWAYS-VISIBLE quick-nav strip. Remove this call before shipping
+    # the assessment to real candidates.
+    _nav_bar()
 
     mode = st.session_state.mode
     stage = st.session_state.stage
