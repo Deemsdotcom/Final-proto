@@ -80,6 +80,18 @@ _GLOBAL_CSS = f"""
     background: {NAVY_DEEP};
     font-family: 'Ubuntu', Arial, sans-serif;
     color: {TEXT_PRIMARY};
+
+    /* Typography scale — single source of truth for every page.
+       Bump any size here and it cascades to every helper that uses it. */
+    --cap-text-display:  3.2rem;
+    --cap-text-h2:       2.25rem;
+    --cap-text-h3:       1.75rem;
+    --cap-text-lead:     1.4rem;
+    --cap-text-body:     1.2rem;
+    --cap-text-body-sm:  1.05rem;
+    --cap-text-meta:     1.0rem;
+    --cap-text-eyebrow:  0.88rem;
+    --cap-text-caption:  0.82rem;
 }}
 
 /* Remove Streamlit's outer padding so we control every pixel */
@@ -453,7 +465,7 @@ _GLOBAL_CSS = f"""
 }}
 .cap-station .cap-station-title {{
     color: {TEXT_PRIMARY};
-    font-size: 1.35rem;
+    font-size: 1.65rem;
     font-weight: 700;
     line-height: 1.2;
     margin-bottom: 0.35rem;
@@ -516,7 +528,7 @@ _GLOBAL_CSS = f"""
 }}
 .cap-theme-card .cap-theme-title {{
     color: {TEXT_PRIMARY};
-    font-size: 1.55rem;
+    font-size: 1.85rem;
     font-weight: 700;
     line-height: 1.15;
     margin-bottom: 0.55rem;
