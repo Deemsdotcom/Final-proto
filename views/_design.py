@@ -48,15 +48,19 @@ TEXT_MUTED     = "#6B7A9E"
 # ── Capgemini Invent logo (inline SVG) ──────────────────────────────────────
 # Two overlapping angled stripes → Capgemini mark  +  Ubuntu-style wordmark
 _LOGO_SVG = (
-    '<svg viewBox="0 0 200 44" height="36" xmlns="http://www.w3.org/2000/svg">'
-    # Capgemini wordmark
-    '<text x="0" y="28"'
-    ' font-family="Ubuntu,Arial,sans-serif"'
-    ' font-weight="700" font-size="22" fill="#FFFFFF"'
-    ' letter-spacing="-0.5">Capgemini</text>'
-    # The signature curved sweep underneath (cyan, simplified)
-    '<path d="M0,36 Q50,46 100,36 T180,32"'
-    ' stroke="#1DB8F2" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
+    '<svg viewBox="0 0 240 50" height="42" xmlns="http://www.w3.org/2000/svg">'
+    # Capgemini wordmark in brand blue
+    '<text x="0" y="34"'
+    ' font-family="\'Comfortaa\', \'Ubuntu\', Arial, sans-serif"'
+    ' font-weight="700" font-size="32" fill="#0070AD"'
+    ' letter-spacing="-1">Capgemini</text>'
+    # The signature underline curve (brand blue)
+    '<path d="M2,42 Q60,48 130,42 T200,38"'
+    ' stroke="#0070AD" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
+    # Brand mark (leaf shape) to the right
+    '<path d="M210,18 Q220,8 228,18 Q230,28 220,32 Q212,34 210,28 Z"'
+    ' fill="#0070AD"/>'
+    '<circle cx="218" cy="22" r="2.5" fill="#FFFFFF"/>'
     '</svg>'
 )
 
@@ -68,7 +72,7 @@ _PAD = "3.5rem"
 _GLOBAL_CSS = f"""
 <style>
 /* Ubuntu from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&family=Comfortaa:wght@600;700&display=swap');
 
 /* ── Base ──────────────────────────────────────────────────────────────── */
 .stApp {{
@@ -859,6 +863,75 @@ ol.cap-edit-steps li strong {{
         grid-template-columns: 1fr;
     }}
     .cap-spread-left .side-num {{ font-size: 5rem; }}
+}}
+
+/* ── Question screen (Layer 1) ─────────────────────────────────────────────
+   Header eyebrow + horizontal progress rail + countdown timer pill,
+   then a styled question card with bigger stem text. Replaces the
+   default Streamlit chrome.                                            */
+.cap-q-eyebrow {{
+    color: {BLUE_CYAN};
+    font-size: var(--cap-text-eyebrow);
+    font-weight: 700;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    margin: 0 0 0.85rem 0;
+}}
+.cap-q-bar {{
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    margin: 0 0 1.5rem 0;
+}}
+.cap-q-progress {{
+    flex: 1;
+    height: 10px;
+    background: {NAVY_CARD_2};
+    border: 1px solid {NAVY_BORDER};
+    border-radius: 5px;
+    overflow: hidden;
+}}
+.cap-q-progress-fill {{
+    height: 100%;
+    background: linear-gradient(90deg, {BLUE_PRIMARY} 0%, {BLUE_CYAN} 100%);
+    transition: width 0.3s ease;
+    border-radius: 4px;
+}}
+.cap-q-timer {{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.1rem;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: var(--cap-text-meta);
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    border: 1.5px solid;
+    flex-shrink: 0;
+    font-family: 'Ubuntu', sans-serif;
+}}
+.cap-q-timer.tone-ok {{ color: {BLUE_CYAN}; background: rgba(29,184,242,0.10); border-color: {BLUE_CYAN}; }}
+.cap-q-timer.tone-warn {{ color: {AMBER}; background: rgba(254,177,0,0.12); border-color: {AMBER}; }}
+.cap-q-timer.tone-crit {{ color: {RED}; background: rgba(255,129,110,0.15); border-color: {RED}; }}
+.cap-q-timer .dot {{
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.05);
+}}
+.cap-q-stem {{
+    color: {TEXT_PRIMARY};
+    font-size: 1.95rem;
+    font-weight: 600;
+    line-height: 1.35;
+    margin: 0.5rem 0 1.5rem 0;
+    letter-spacing: -0.005em;
+    font-family: 'Ubuntu', sans-serif;
+}}
+.cap-q-submit-spacer {{
+    height: 0.6rem;
 }}
 </style>
 """

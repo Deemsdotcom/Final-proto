@@ -34,10 +34,10 @@ THEME_LABELS = {
     "logical": {
         "short": "Logical",
         "title": "Logical Reasoning",
-        "subtitle": "Spot the pattern across rows and columns. Pick the figure that completes the matrix.",
+        "subtitle": "Find the pattern in the sequence and pick the figure that comes next.",
         "options": "A · E",
         "setup_html": (
-            "Each question shows a <strong>3×3 grid of figures</strong> with the "
+            "Each question shows a <strong>sequence of 5 figures</strong>. The "
             "bottom-right cell missing. The figures change across rows and columns "
             "according to a hidden rule. Your job is to work out the rule and pick "
             "the option (A · E) that completes the grid."
@@ -47,8 +47,8 @@ THEME_LABELS = {
             "Counting", "Color &amp; shading",
         ],
         "look_for_note": (
-            "Patterns can combine multiple rules. Most matrices have one dominant "
-            "rule running along rows and a second along columns."
+            "Patterns can combine multiple rules. Track how each figure changes "
+            "from one step to the next, then project that change forward."
         ),
         "tips": [
             ("Rows first.", "The pattern often runs more obviously along rows than columns."),
@@ -174,8 +174,8 @@ def _layer_overview() -> None:
             meta="Theme 1",
             title="Logical Reasoning",
             desc=(
-                "Abstract 3×3 matrix puzzles. Spot the pattern across rows "
-                "and columns, then pick the figure that completes the grid."
+                "Figure sequences. Spot how each figure changes from one to the next, "
+                "then pick the one that comes next."
             ),
             stats=[(f"{QUESTIONS_PER_THEME}", "Questions"), ("75 s", "Per question")],
         )
@@ -355,7 +355,7 @@ def _render_question(
         remaining=remaining,
         seconds=seconds,
         eyebrow_text=(
-            f"Stage 1 of 3 · {label['title']} · Question {question_idx + 1} of {total}"
+            f"{label['title']} · Question {question_idx + 1} of {total}"
         ),
     )
 
