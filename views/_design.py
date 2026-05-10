@@ -827,13 +827,16 @@ ol.cap-edit-steps li strong {{
     text-transform: uppercase;
 }}
 .cap-spread-right {{
+    /* Hosts the title block + a 2x2 grid of mini feature cards */
+    display: flex;
+    flex-direction: column;
+    gap: 1.4rem;
+}}
+.cap-spread-right .right-head {{
     background: {NAVY_CARD};
     border: 1px solid {NAVY_BORDER};
     border-radius: 8px;
-    padding: 2.1rem 2.4rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
+    padding: 1.7rem 2rem;
 }}
 .cap-spread-right .right-eyebrow {{
     color: {BLUE_CYAN};
@@ -841,7 +844,7 @@ ol.cap-edit-steps li strong {{
     font-weight: 700;
     letter-spacing: 0.22em;
     text-transform: uppercase;
-    margin: 0;
+    margin: 0 0 0.4rem 0;
 }}
 .cap-spread-right .right-title {{
     color: {TEXT_PRIMARY};
@@ -850,17 +853,127 @@ ol.cap-edit-steps li strong {{
     font-size: 2.4rem;
     line-height: 1.1;
     letter-spacing: -0.02em;
-    margin: 0.3rem 0 0.5rem 0;
+    margin: 0 0 0.5rem 0;
 }}
 .cap-spread-right .right-sub {{
     color: {TEXT_SECONDARY};
     font-size: var(--cap-text-lead);
-    line-height: 1.55;
-    margin: 0 0 0.5rem 0;
+    line-height: 1.5;
+    margin: 0;
 }}
-.cap-spread-right hr.cap-edit-divider {{ margin: 0; }}
-.cap-spread-right .cap-edit-section {{ padding: 0; }}
-.cap-spread-right .cap-edit-section + .cap-edit-section {{ padding-top: 1.4rem; }}
+
+/* 2x2 grid of mini feature cards */
+.cap-feat-grid {{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}}
+.cap-feat {{
+    background: {NAVY_CARD};
+    border: 1px solid {NAVY_BORDER};
+    border-top: 3px solid {BLUE_CYAN};
+    border-radius: 8px;
+    padding: 1.3rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+}}
+.cap-feat-eyebrow {{
+    color: {BLUE_CYAN};
+    font-size: var(--cap-text-eyebrow);
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin: 0 0 0.85rem 0;
+}}
+.cap-feat-body {{
+    color: {TEXT_PRIMARY};
+    font-size: var(--cap-text-body);
+    line-height: 1.5;
+    margin: 0;
+}}
+.cap-feat-body strong {{
+    color: {BLUE_CYAN};
+    font-weight: 700;
+}}
+.cap-feat-stats {{
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin-top: 0.2rem;
+}}
+.cap-feat-stat-line {{
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+    border-bottom: 1px solid {NAVY_BORDER};
+}}
+.cap-feat-stat-line:last-child {{ border-bottom: none; }}
+.cap-feat-stat-num {{
+    color: {TEXT_PRIMARY};
+    font-weight: 700;
+    font-size: 1.15rem;
+    font-variant-numeric: tabular-nums;
+}}
+.cap-feat-stat-label {{
+    color: {TEXT_SECONDARY};
+    font-size: var(--cap-text-eyebrow);
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}}
+.cap-feat-pills {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.2rem;
+}}
+.cap-feat-pill {{
+    background: rgba(29,184,242,0.10);
+    border: 1px solid rgba(29,184,242,0.35);
+    color: {TEXT_PRIMARY};
+    font-size: var(--cap-text-body-sm);
+    font-weight: 600;
+    padding: 0.28rem 0.7rem;
+    border-radius: 999px;
+}}
+.cap-feat-tips {{
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: feattip;
+}}
+.cap-feat-tips li {{
+    counter-increment: feattip;
+    color: {TEXT_PRIMARY};
+    font-size: var(--cap-text-body-sm);
+    line-height: 1.5;
+    padding: 0.4rem 0 0.4rem 1.7rem;
+    position: relative;
+    border-bottom: 1px solid {NAVY_BORDER};
+}}
+.cap-feat-tips li:last-child {{ border-bottom: none; padding-bottom: 0.2rem; }}
+.cap-feat-tips li:first-child {{ padding-top: 0.1rem; }}
+.cap-feat-tips li::before {{
+    content: counter(feattip);
+    position: absolute;
+    left: 0;
+    top: 0.5rem;
+    color: {BLUE_CYAN};
+    font-weight: 700;
+    font-size: 0.85rem;
+    width: 1.4rem;
+    font-variant-numeric: tabular-nums;
+}}
+.cap-feat-tips li strong {{
+    color: {TEXT_PRIMARY};
+    font-weight: 700;
+    margin-right: 0.3rem;
+}}
+
+@media (max-width: 700px) {{
+    .cap-feat-grid {{ grid-template-columns: 1fr; }}
+}}
 
 /* Mobile-ish stacking when the viewport gets narrow */
 @media (max-width: 900px) {{
@@ -1356,18 +1469,19 @@ def theme_spread(
     side_num: str,
     side_eyebrow: str,
     stats: list,
-    sections: list,
+    features: list,
 ) -> None:
-    """Render the asymmetric magazine-spread layout used by Layer 1
-    theme intros.
+    """Asymmetric magazine-spread layout for Layer 1 theme intros.
 
-    Left panel: small eyebrow, a huge theme number with cyan-to-white
-    gradient, then a vertical list of stats (questions, time, options).
-    Right panel: small eyebrow, bold title, subtitle, then any number of
-    editorial sub-sections separated by thin dividers.
+    Left panel (1fr): small eyebrow, a huge theme number with cyan-to-
+    white gradient text, and a vertical stat ladder at the bottom.
+    Right panel (2.4fr): a head card carrying the title + subtitle,
+    then a 2x2 grid of mini feature cards (The task / The format /
+    Watch for / Strategy).
 
-    `stats`  : list of (number, unit, label) tuples
-    `sections`: list of dicts with keys 'eyebrow' and 'body_html'
+    `stats`    : list of (number, unit, label) tuples for the left side
+    `features` : list of dicts with keys 'eyebrow' and 'body_html' —
+                 each becomes one mini card in the 2x2 grid.
     """
     stat_rows = []
     for num, unit, label in stats:
@@ -1381,14 +1495,12 @@ def theme_spread(
             '</div>'
         )
 
-    section_blocks = []
-    for i, sec in enumerate(sections):
-        if i > 0:
-            section_blocks.append('<hr class="cap-edit-divider"/>')
-        section_blocks.append(
-            '<div class="cap-edit-section">'
-            '<h4 class="cap-edit-eyebrow">' + _esc(sec.get("eyebrow", "")) + '</h4>'
-            + sec.get("body_html", "")
+    feat_blocks = []
+    for feat in features:
+        feat_blocks.append(
+            '<div class="cap-feat">'
+            '<div class="cap-feat-eyebrow">' + _esc(feat.get("eyebrow", "")) + '</div>'
+            + feat.get("body_html", "")
             + '</div>'
         )
 
@@ -1400,10 +1512,12 @@ def theme_spread(
         '<div class="side-stats">' + "".join(stat_rows) + '</div>'
         '</div>'
         '<div class="cap-spread-right">'
+        '<div class="right-head">'
         '<div class="right-eyebrow">' + _esc(eyebrow) + '</div>'
         '<div class="right-title">' + _esc(title) + '</div>'
         '<div class="right-sub">' + _esc(subtitle) + '</div>'
-        + "".join(section_blocks) +
+        '</div>'
+        '<div class="cap-feat-grid">' + "".join(feat_blocks) + '</div>'
         '</div>'
         '</div>'
     )

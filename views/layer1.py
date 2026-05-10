@@ -274,14 +274,44 @@ def _theme_intro(theme: str, theme_idx: int) -> None:
         f'<li><strong>{head}</strong> {body}</li>' for head, body in label["tips"]
     ) + '</ol>'
 
-    section_2_eyebrow = (
+    total_min = (seconds * QUESTIONS_PER_THEME + 30) // 60
+
+    pills_html = (
+        '<div class="cap-feat-pills">'
+        + "".join(
+            f'<span class="cap-feat-pill">{t}</span>'
+            for t in label["pattern_tags"]
+        )
+        + "</div>"
+    )
+
+    # Trim tips to the top 3 for the right-hand mini card; they appear in
+    # full in the editorial copy below if we ever bring it back.
+    tips_short_html = (
+        '<ol class="cap-feat-tips">'
+        + "".join(
+            f'<li><strong>{head}</strong>{body}</li>'
+            for head, body in label["tips"][:3]
+        )
+        + "</ol>"
+    )
+
+    format_stats_html = (
+        '<div class="cap-feat-stats">'
+        f'<div class="cap-feat-stat-line"><span class="cap-feat-stat-num">{QUESTIONS_PER_THEME}</span><span class="cap-feat-stat-label">Questions</span></div>'
+        f'<div class="cap-feat-stat-line"><span class="cap-feat-stat-num">{seconds}s</span><span class="cap-feat-stat-label">Per question</span></div>'
+        f'<div class="cap-feat-stat-line"><span class="cap-feat-stat-num">~{total_min} min</span><span class="cap-feat-stat-label">Total time</span></div>'
+        '</div>'
+    )
+
+    watch_eyebrow = (
         "Pattern types to look for" if theme == "logical" else
         ("What the data looks like" if theme == "numerical" else
-         "How to read the answer choices")
+         "Possible answers")
     )
 
     ui.theme_spread(
-        eyebrow=f"Stage 1 of 3 · Theme {theme_idx + 1} of 3",
+        eyebrow=f"Theme {theme_idx + 1} of 3",
         title=label["title"],
         subtitle=label["subtitle"],
         side_num=f"0{theme_idx + 1}",
@@ -291,18 +321,22 @@ def _theme_intro(theme: str, theme_idx: int) -> None:
             (str(seconds),              "s", "Per question"),
             (label["options"],          "",  "Options"),
         ],
-        sections=[
+        features=[
             {
                 "eyebrow": "The task",
-                "body_html": '<p class="cap-edit-lead">' + label["setup_html"] + '</p>',
+                "body_html": '<p class="cap-feat-body">' + label["setup_html"] + '</p>',
             },
             {
-                "eyebrow": section_2_eyebrow,
-                "body_html": tags_html,
+                "eyebrow": "The format",
+                "body_html": format_stats_html,
             },
             {
-                "eyebrow": "How to approach it",
-                "body_html": steps_html,
+                "eyebrow": watch_eyebrow,
+                "body_html": pills_html + '<p class="cap-feat-body" style="margin-top:0.7rem;color:var(--cap-text-secondary,#A0AECB);font-size:var(--cap-text-body-sm);">' + label["look_for_note"] + '</p>',
+            },
+            {
+                "eyebrow": "Top strategy",
+                "body_html": tips_short_html,
             },
         ],
     )
