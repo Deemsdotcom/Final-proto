@@ -113,7 +113,7 @@ def _render_candidate_view(scores: dict) -> None:
     st.subheader("Layer breakdown")
     bar = go.Figure()
     bar.add_trace(go.Bar(
-        x=["Layer 1 — Cognitive", "Layer 2 — Staffing", "Layer 3 — Interview"],
+        x=["Layer 1 · Cognitive", "Layer 2 · Staffing", "Layer 3 · Interview"],
         y=[scores["layer1_score"], scores["layer2_score"], scores["layer3_score"]],
         marker_color=["#3B82F6", "#10B981", "#F59E0B"],
         text=[f"{scores['layer1_score']:.0f}",

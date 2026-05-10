@@ -48,20 +48,15 @@ TEXT_MUTED     = "#6B7A9E"
 # ── Capgemini Invent logo (inline SVG) ──────────────────────────────────────
 # Two overlapping angled stripes → Capgemini mark  +  Ubuntu-style wordmark
 _LOGO_SVG = (
-    '<svg viewBox="0 0 220 44" height="36" xmlns="http://www.w3.org/2000/svg">'
-    # mark: left stripe (primary blue)
-    '<path d="M2,38 L14,6 L21,6 L9,38 Z" fill="#0058AB"/>'
-    # mark: right stripe (bright cyan, slightly offset)
-    '<path d="M11,38 L23,6 L30,6 L18,38 Z" fill="#1DB8F2"/>'
-    # wordmark
-    '<text x="40" y="27"'
+    '<svg viewBox="0 0 200 44" height="36" xmlns="http://www.w3.org/2000/svg">'
+    # Capgemini wordmark
+    '<text x="0" y="28"'
     ' font-family="Ubuntu,Arial,sans-serif"'
-    ' font-weight="700" font-size="20" fill="#FFFFFF"'
-    '>Capgemini</text>'
-    '<text x="41" y="41"'
-    ' font-family="Ubuntu,Arial,sans-serif"'
-    ' font-weight="500" font-size="11" fill="#1DB8F2"'
-    ' letter-spacing="4">INVENT</text>'
+    ' font-weight="700" font-size="22" fill="#FFFFFF"'
+    ' letter-spacing="-0.5">Capgemini</text>'
+    # The signature curved sweep underneath (cyan, simplified)
+    '<path d="M0,36 Q50,46 100,36 T180,32"'
+    ' stroke="#1DB8F2" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
     '</svg>'
 )
 
@@ -81,7 +76,7 @@ _GLOBAL_CSS = f"""
     font-family: 'Ubuntu', Arial, sans-serif;
     color: {TEXT_PRIMARY};
 
-    /* Typography scale — single source of truth for every page.
+    /* Typography scale · single source of truth for every page.
        Bump any size here and it cascades to every helper that uses it. */
     --cap-text-display:  3.2rem;
     --cap-text-h2:       2.25rem;
@@ -99,9 +94,12 @@ _GLOBAL_CSS = f"""
     padding: 0 !important;
 }}
 
-/* Full-width block container */
+/* Full-width block container · restore breathing room at the top so
+   the page eyebrow / title is not clipped against the viewport edge.
+   2rem leaves enough room for a comfortable hero start without
+   wasting screen space. */
 .stApp [data-testid="stMain"] .block-container {{
-    padding-top: 0 !important;
+    padding-top: 2rem !important;
     padding-bottom: 5rem !important;
     padding-left: {_PAD} !important;
     padding-right: {_PAD} !important;
@@ -211,7 +209,7 @@ _GLOBAL_CSS = f"""
     flex-direction: column !important;
     flex: 1 !important;
 }}
-/* Inner block — also flex so button can be pushed down */
+/* Inner block · also flex so button can be pushed down */
 .stApp [data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="stVerticalBlock"] {{
     display: flex !important;
     flex-direction: column !important;
@@ -222,7 +220,7 @@ _GLOBAL_CSS = f"""
    bottom. We target the stElementContainer (the actual flex item) rather
    than .stButton (which is the inner element and not part of the flex
    layout). The selector also handles cases where the last child is a
-   form or another widget container — anything that ends up last in the
+   form or another widget container · anything that ends up last in the
    card gets aligned to the bottom of the card body. */
 .stApp [data-testid="stVerticalBlockBorderWrapper"]
   > div[data-testid="stVerticalBlock"]
@@ -363,7 +361,7 @@ _GLOBAL_CSS = f"""
 /* ── Radio / Checkbox ────────────────────────────────────────────────────── */
 .stApp [data-testid="stRadio"] label {{ color: {TEXT_PRIMARY}; }}
 
-/* ── Card paragraph — equalise heights across sibling cards ─────────────── */
+/* ── Card paragraph · equalise heights across sibling cards ─────────────── */
 .cap-card p {{
     min-height: 3.8rem;
     margin: 0 0 1.25rem 0;
@@ -380,7 +378,7 @@ _GLOBAL_CSS = f"""
 .stApp footer {{ visibility: hidden; }}
 .stApp #MainMenu {{ visibility: hidden; }}
 
-/* ── Equal-height columns — full flex cascade to pin button at bottom ──────── */
+/* ── Equal-height columns · full flex cascade to pin button at bottom ──────── */
 /* Row: stretch all columns to the tallest one's height */
 .stApp [data-testid="stHorizontalBlock"] {{
     align-items: stretch !important;
@@ -407,11 +405,11 @@ _GLOBAL_CSS = f"""
     display: flex !important;
     flex-direction: column !important;
 }}
-/* (No per-markdown flex rule needed — the last-child margin-top:auto
+/* (No per-markdown flex rule needed · the last-child margin-top:auto
    above takes care of bottom-aligning the CTA in action cards.) */
 
 /* ── Vertical journey timeline ─────────────────────────────────────────────
-   Used by ui.journey_timeline() — a column of "stations" (numbered
+   Used by ui.journey_timeline() - a column of "stations" (numbered
    circles) connected by a glowing cyan rail, with each station's content
    to the right of its circle. */
 .cap-journey {{
@@ -479,7 +477,7 @@ _GLOBAL_CSS = f"""
 }}
 
 /* ── Theme hero cards ──────────────────────────────────────────────────────
-   Used by ui.theme_card() — a tall card with an inline SVG illustration
+   Used by ui.theme_card() - a tall card with an inline SVG illustration
    at the top, a meta pill, big theme name, and a short description. Used
    on the Layer 1 overview to give each reasoning theme its own visual
    identity. */
@@ -709,7 +707,7 @@ _GLOBAL_CSS = f"""
     opacity: 0.7;
     margin: 0 0.25rem;
 }}
-/* Numbered list with cyan numerals — used for the "how to approach" tips */
+/* Numbered list with cyan numerals · used for the "how to approach" tips */
 ol.cap-edit-steps {{
     counter-reset: capstep;
     list-style: none;
@@ -744,12 +742,130 @@ ol.cap-edit-steps li strong {{
     font-weight: 700;
     margin-right: 0.4rem;
 }}
+
+/* ── Theme-intro magazine spread ───────────────────────────────────────────
+   Asymmetric two-panel layout used by Layer 1 theme intros. Left panel
+   is a narrow editorial column with a HUGE theme number and stacked
+   stat rows; right panel carries the title, subtitle, and editorial
+   sections. Designed to feel like a print magazine spread.            */
+.cap-spread {{
+    display: grid;
+    grid-template-columns: 1fr 2.4fr;
+    gap: 1.5rem;
+    align-items: stretch;
+    margin: 0.4rem 0 1.2rem 0;
+}}
+.cap-spread-left {{
+    background: linear-gradient(180deg, {NAVY_CARD_2} 0%, {NAVY_CARD} 100%);
+    border: 1px solid {NAVY_BORDER};
+    border-left: 4px solid {BLUE_CYAN};
+    border-radius: 8px;
+    padding: 2rem 1.6rem;
+    display: flex;
+    flex-direction: column;
+}}
+.cap-spread-left .side-eyebrow {{
+    color: {BLUE_CYAN};
+    font-size: var(--cap-text-eyebrow);
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin: 0 0 0.5rem 0;
+}}
+.cap-spread-left .side-num {{
+    color: {TEXT_PRIMARY};
+    font-family: 'Ubuntu', sans-serif;
+    font-weight: 700;
+    font-size: 7rem;
+    line-height: 0.95;
+    letter-spacing: -0.04em;
+    margin: 0.2rem 0 1.5rem 0;
+    background: linear-gradient(135deg, {TEXT_PRIMARY} 0%, {BLUE_CYAN} 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}}
+.cap-spread-left .side-stats {{
+    margin-top: auto;
+    border-top: 1px solid {NAVY_BORDER};
+    padding-top: 1rem;
+}}
+.cap-spread-left .stat-row {{
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid {NAVY_BORDER};
+}}
+.cap-spread-left .stat-row:last-child {{ border-bottom: none; }}
+.cap-spread-left .stat-num {{
+    color: {TEXT_PRIMARY};
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}}
+.cap-spread-left .stat-num .unit {{
+    color: {BLUE_CYAN};
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-left: 0.15rem;
+}}
+.cap-spread-left .stat-label {{
+    color: {TEXT_SECONDARY};
+    font-size: var(--cap-text-eyebrow);
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}}
+.cap-spread-right {{
+    background: {NAVY_CARD};
+    border: 1px solid {NAVY_BORDER};
+    border-radius: 8px;
+    padding: 2.1rem 2.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}}
+.cap-spread-right .right-eyebrow {{
+    color: {BLUE_CYAN};
+    font-size: var(--cap-text-eyebrow);
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin: 0;
+}}
+.cap-spread-right .right-title {{
+    color: {TEXT_PRIMARY};
+    font-family: 'Ubuntu', sans-serif;
+    font-weight: 700;
+    font-size: 2.4rem;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin: 0.3rem 0 0.5rem 0;
+}}
+.cap-spread-right .right-sub {{
+    color: {TEXT_SECONDARY};
+    font-size: var(--cap-text-lead);
+    line-height: 1.55;
+    margin: 0 0 0.5rem 0;
+}}
+.cap-spread-right hr.cap-edit-divider {{ margin: 0; }}
+.cap-spread-right .cap-edit-section {{ padding: 0; }}
+.cap-spread-right .cap-edit-section + .cap-edit-section {{ padding-top: 1.4rem; }}
+
+/* Mobile-ish stacking when the viewport gets narrow */
+@media (max-width: 900px) {{
+    .cap-spread {{
+        grid-template-columns: 1fr;
+    }}
+    .cap-spread-left .side-num {{ font-size: 5rem; }}
+}}
 </style>
 """
 
 
 def inject_global_styles() -> None:
-    """Inject the app-wide CSS. Idempotent — safe to call on every render."""
+    """Inject the app-wide CSS. Idempotent · safe to call on every render."""
     st.markdown(_GLOBAL_CSS, unsafe_allow_html=True)
 
 
@@ -765,7 +881,7 @@ def header(meta: Optional[str] = None) -> None:
 
 
 def eyebrow(text: str) -> None:
-    """Small all-caps cyan label with glowing dot — used above page titles."""
+    """Small all-caps cyan label with glowing dot · used above page titles."""
     st.markdown(
         f'<div class="cap-eyebrow"><span class="dot"></span>{_esc(text)}</div>',
         unsafe_allow_html=True,
@@ -783,7 +899,7 @@ def page_title(title: str, subtitle: Optional[str] = None) -> None:
 
 
 def metric(value: str, label: str) -> None:
-    """KPI card — big value + short uppercase descriptor."""
+    """KPI card · big value + short uppercase descriptor."""
     st.markdown(
         f"""
         <div class="cap-metric">
@@ -797,7 +913,7 @@ def metric(value: str, label: str) -> None:
 
 @contextmanager
 def card(eyebrow_text: Optional[str] = None) -> Iterator[None]:
-    """Context manager — wraps Streamlit widgets in a styled bordered card.
+    """Context manager · wraps Streamlit widgets in a styled bordered card.
 
     Uses st.container(border=True) so Streamlit properly wraps all yielded
     widgets. The border/background/radius are applied via CSS targeting
@@ -929,7 +1045,7 @@ def theme_card(
     description, and an optional row of small stat boxes at the bottom.
 
     `stats` is a list of (value, label) tuples. They render as a thin
-    bordered strip across the bottom of the card — ideal for showing
+    bordered strip across the bottom of the card · ideal for showing
     things like "10 questions" + "75 sec / question".
 
     HTML is emitted as a single line to avoid Streamlit's markdown parser
@@ -970,15 +1086,15 @@ THEME_DEMO_LOGICAL = (
     '<line x1="240" y1="10" x2="240" y2="350" stroke="#28387A" stroke-dasharray="3 4" opacity="0.5"/>'
     '<line x1="10" y1="120" x2="350" y2="120" stroke="#28387A" stroke-dasharray="3 4" opacity="0.5"/>'
     '<line x1="10" y1="240" x2="350" y2="240" stroke="#28387A" stroke-dasharray="3 4" opacity="0.5"/>'
-    # Row 1 — open shapes
+    # Row 1 · open shapes
     '<polygon points="60,40 90,90 30,90" stroke="#1DB8F2" stroke-width="2.5"/>'
     '<rect x="150" y="40" width="60" height="50" stroke="#1DB8F2" stroke-width="2.5"/>'
     '<circle cx="300" cy="65" r="28" stroke="#1DB8F2" stroke-width="2.5"/>'
-    # Row 2 — filled shapes
+    # Row 2 · filled shapes
     '<polygon points="60,160 90,210 30,210" fill="#1DB8F2"/>'
     '<rect x="150" y="160" width="60" height="50" fill="#1DB8F2"/>'
     '<circle cx="300" cy="185" r="28" fill="#1DB8F2"/>'
-    # Row 3 — half-filled
+    # Row 3 · half-filled
     '<polygon points="60,280 90,330 30,330" stroke="#1DB8F2" stroke-width="2.5" fill="#1DB8F2" fill-opacity="0.45"/>'
     '<rect x="150" y="280" width="60" height="50" stroke="#1DB8F2" stroke-width="2.5" fill="#1DB8F2" fill-opacity="0.45"/>'
     # Missing cell with question mark
@@ -1075,7 +1191,7 @@ def chip_row(items: list) -> None:
 
 def chip_list(items: list) -> None:
     """Vertical bullet-style list with strong-tagged head + body.
-    items: list of (head, body) tuples — head appears bold, body in
+    items: list of (head, body) tuples · head appears bold, body in
     muted text body. Use for short tip lists where each tip has a
     one-word strategy verb followed by a sentence of detail.
     """
@@ -1146,10 +1262,71 @@ def question_progress_bar(idx: int, total: int, remaining: int, seconds: int,
 
 
 def question_stem(text: str) -> None:
-    """Render the question stem in large bold text — the primary content
+    """Render the question stem in large bold text · the primary content
     on the question screen.
     """
     st.markdown(
         '<div class="cap-q-stem">' + _esc(text) + '</div>',
         unsafe_allow_html=True,
     )
+
+
+def theme_spread(
+    eyebrow: str,
+    title: str,
+    subtitle: str,
+    side_num: str,
+    side_eyebrow: str,
+    stats: list,
+    sections: list,
+) -> None:
+    """Render the asymmetric magazine-spread layout used by Layer 1
+    theme intros.
+
+    Left panel: small eyebrow, a huge theme number with cyan-to-white
+    gradient, then a vertical list of stats (questions, time, options).
+    Right panel: small eyebrow, bold title, subtitle, then any number of
+    editorial sub-sections separated by thin dividers.
+
+    `stats`  : list of (number, unit, label) tuples
+    `sections`: list of dicts with keys 'eyebrow' and 'body_html'
+    """
+    stat_rows = []
+    for num, unit, label in stats:
+        unit_html = (
+            '<span class="unit">' + _esc(unit) + '</span>' if unit else ""
+        )
+        stat_rows.append(
+            '<div class="stat-row">'
+            '<span class="stat-num">' + _esc(num) + unit_html + '</span>'
+            '<span class="stat-label">' + _esc(label) + '</span>'
+            '</div>'
+        )
+
+    section_blocks = []
+    for i, sec in enumerate(sections):
+        if i > 0:
+            section_blocks.append('<hr class="cap-edit-divider"/>')
+        section_blocks.append(
+            '<div class="cap-edit-section">'
+            '<h4 class="cap-edit-eyebrow">' + _esc(sec.get("eyebrow", "")) + '</h4>'
+            + sec.get("body_html", "")
+            + '</div>'
+        )
+
+    html = (
+        '<div class="cap-spread">'
+        '<div class="cap-spread-left">'
+        '<div class="side-eyebrow">' + _esc(side_eyebrow) + '</div>'
+        '<div class="side-num">' + _esc(side_num) + '</div>'
+        '<div class="side-stats">' + "".join(stat_rows) + '</div>'
+        '</div>'
+        '<div class="cap-spread-right">'
+        '<div class="right-eyebrow">' + _esc(eyebrow) + '</div>'
+        '<div class="right-title">' + _esc(title) + '</div>'
+        '<div class="right-sub">' + _esc(subtitle) + '</div>'
+        + "".join(section_blocks) +
+        '</div>'
+        '</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)

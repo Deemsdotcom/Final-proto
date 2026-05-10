@@ -86,7 +86,7 @@ def _nav_bar() -> None:
         c1, c2 = st.columns([3, 1])
         with c1:
             st.caption(
-                "No candidate yet — create a test one to enable stage jumps."
+                "No candidate yet · create a test one to enable stage jumps."
             )
         with c2:
             if st.button(
@@ -179,7 +179,7 @@ def _jump_layer1(theme: str, kind: str) -> None:
 
 def main() -> None:
     st.set_page_config(
-        page_title="Capgemini Invent — Consulting Assessment",
+        page_title="Capgemini Invent · Consulting Assessment",
         page_icon="📊",
         layout="wide",
         initial_sidebar_state="collapsed",

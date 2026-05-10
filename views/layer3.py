@@ -71,7 +71,7 @@ def render() -> None:
 
 
 def _intro() -> None:
-    st.title("Layer 3 — AI-Led Interview")
+    st.title("Layer 3 · AI-Led Interview")
     st.markdown(
         f"""
         You'll be asked **{COMPETENCY_COUNT} interview questions**. The AI
@@ -118,7 +118,7 @@ def _render_question(comp: dict, phase: str, question_text: str) -> None:
 
     col1, col2 = st.columns([3, 1])
     with col1:
-        st.markdown(f"**Layer 3 — Question {comp_idx + 1} of {COMPETENCY_COUNT}**")
+        st.markdown(f"**Layer 3 · Question {comp_idx + 1} of {COMPETENCY_COUNT}**")
         st.progress(
             (exchange_num - 1) / total_exchanges,
             text=f"Exchange {exchange_num} of {total_exchanges}",
@@ -129,7 +129,7 @@ def _render_question(comp: dict, phase: str, question_text: str) -> None:
     st.divider()
     heading = f"Question {comp_idx + 1}"
     if phase == "followup":
-        heading += " — follow-up"
+        heading += " - follow-up"
     st.markdown(f"### {heading}")
     st.info(question_text)
 
@@ -154,7 +154,7 @@ def _render_question(comp: dict, phase: str, question_text: str) -> None:
         if MIC_AVAILABLE:
             st.markdown("**Record your answer** (up to 1.5 minutes):")
             # Pass sample_rate=16000 if this Streamlit version supports it
-            # (added in mid-2025). Falls back gracefully on older versions —
+            # (added in mid-2025). Falls back gracefully on older versions -
             # those defaulted to a higher rate which Azure may still accept.
             audio_input_kwargs = {
                 "key": f"mic_{comp_idx}_{phase}",
@@ -193,7 +193,7 @@ def _render_question(comp: dict, phase: str, question_text: str) -> None:
                         try:
                             transcript = transcribe_audio(audio_bytes, filename="recording.wav")
                             if not transcript:
-                                raise ValueError("Empty transcript — recording may have been silent.")
+                                raise ValueError("Empty transcript · recording may have been silent.")
                             st.session_state[transcript_key] = transcript
                             st.session_state[transcript_shown_key] = True
                             st.rerun()
@@ -205,7 +205,7 @@ def _render_question(comp: dict, phase: str, question_text: str) -> None:
                             # - 400 unsupported_format: API version too old or
                             #   audio sample rate not 16kHz mono
                             st.error(
-                                f"Transcription failed: {type(e).__name__} — {e}\n\n"
+                                f"Transcription failed: {type(e).__name__} - {e}\n\n"
                                 "Type your answer below as a fallback. "
                                 "If this keeps happening, check the Streamlit logs "
                                 "for the underlying Azure error."

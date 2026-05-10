@@ -105,7 +105,7 @@ def render() -> None:
         "Name", "Email", "Completed", "Layer 1", "Layer 2", "Layer 3",
         "Overall", "Top Fit",
     ]
-    display_df["Top Fit"] = display_df["Top Fit"].map({1: "✓", 0: "—"})
+    display_df["Top Fit"] = display_df["Top Fit"].map({1: "✓", 0: "-"})
     display_df["Completed"] = pd.to_datetime(display_df["Completed"]).dt.strftime("%Y-%m-%d %H:%M")
     for col in ["Layer 1", "Layer 2", "Layer 3", "Overall"]:
         display_df[col] = display_df[col].round(1)
@@ -136,7 +136,7 @@ def render() -> None:
         return
 
     options = {
-        f"{row['full_name']} ({row['email']}) — Overall {row['overall_score']:.0f}": row["candidate_id"]
+        f"{row['full_name']} ({row['email']}) - Overall {row['overall_score']:.0f}": row["candidate_id"]
         for _, row in filtered.iterrows()
     }
     chosen_label = st.selectbox("Select a candidate", options=list(options.keys()))
@@ -155,14 +155,14 @@ def _render_deep_dive(candidate_id: str) -> None:
     st.markdown(f"### {candidate['full_name']}")
     st.caption(
         f"{candidate['email']} · Started {candidate['started_at'][:10]} · "
-        f"Completed {candidate['completed_at'][:10] if candidate['completed_at'] else '—'}"
+        f"Completed {candidate['completed_at'][:10] if candidate['completed_at'] else '-'}"
     )
 
     # Top Fit badge
     if scores["top_fit"]:
-        st.success("✓ **Top Fit** — Meets all bar criteria (overall ≥70, no layer <60, ≥2 competencies ≥75)")
+        st.success("✓ **Top Fit** - Meets all bar criteria (overall ≥70, no layer <60, ≥2 competencies ≥75)")
     else:
-        st.warning("— Not flagged as Top Fit")
+        st.warning("- Not flagged as Top Fit")
 
     # Score summary
     cols = st.columns(4)
@@ -211,14 +211,14 @@ def _render_deep_dive(candidate_id: str) -> None:
         st.info("No recruiter summary generated yet.")
 
     # Layer 1 detail
-    with st.expander("Layer 1 — Question-by-question detail"):
+    with st.expander("Layer 1 · Question-by-question detail"):
         l1_rows = db.get_layer1_results(candidate_id)
         if l1_rows:
             df1 = pd.DataFrame([{
                 "Theme": r["theme"],
                 "Question ID": r["question_id"],
                 "Question": (r["question_text"] or "")[:80] + "...",
-                "Candidate's Answer": r["candidate_answer"] or "—",
+                "Candidate's Answer": r["candidate_answer"] or "-",
                 "Correct": r["correct_option"],
                 "✓": "✓" if r["is_correct"] else "✗",
                 "Time (s)": r["time_taken_seconds"],
@@ -228,7 +228,7 @@ def _render_deep_dive(candidate_id: str) -> None:
             st.write("No Layer 1 data.")
 
     # Layer 2 detail
-    with st.expander("Layer 2 — Firm simulation detail"):
+    with st.expander("Layer 2 · Firm simulation detail"):
         l2_sim = db.get_layer2_simulation(candidate_id)
         if not l2_sim:
             st.write("No Layer 2 data.")
@@ -286,7 +286,7 @@ def _render_deep_dive(candidate_id: str) -> None:
                     for a in log["actions"]:
                         issues = f" ⚠️ {' / '.join(a['issues'])}" if a.get("issues") else ""
                         st.markdown(
-                            f"- **{a['project_id']}** ← {', '.join(a['consultant_ids']) or '—'} "
+                            f"- **{a['project_id']}** ← {', '.join(a['consultant_ids']) or '-'} "
                             f"(burn €{a['burn']:,}, quality {a['quality_mult_this_week']:.2f}){issues}"
                         )
                 if log.get("completions"):
@@ -299,7 +299,7 @@ def _render_deep_dive(candidate_id: str) -> None:
                     st.markdown(f"- ⏰ Missed deadline: {', '.join(log['missed_deadlines'])}")
 
     # Layer 3 detail
-    with st.expander("Layer 3 — Interview transcripts"):
+    with st.expander("Layer 3 · Interview transcripts"):
         l3_rows = db.get_layer3_results(candidate_id)
         if not l3_rows:
             st.write("No Layer 3 data.")
@@ -309,7 +309,7 @@ def _render_deep_dive(candidate_id: str) -> None:
         }
         for r in l3_rows:
             header = (
-                f"**Competency {r['competency_order']} — "
+                f"**Competency {r['competency_order']} - "
                 f"{r['competency_id']}: {r['competency_name']}**"
             )
             if r.get("scripted_flag"):

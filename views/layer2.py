@@ -72,35 +72,35 @@ def render() -> None:
 
 
 def _intro() -> None:
-    st.title("Layer 2 — Firm Simulation")
+    st.title("Layer 2 · Firm Simulation")
     st.markdown(
         """
         ### The setup
         You're the resource lead at a consulting firm with **6 consultants** and a starting
         cash balance of **€500,000**. Over the next **8 simulated weeks**, you'll decide
         who works on which project, respond to events, and try to keep the firm in good
-        shape — both financially and reputationally.
+        shape · both financially and reputationally.
 
         Each week you'll see your firm dashboard, the active project board, and your
         consultants' current state. You assign people to projects, then click
         **Advance to next week**. Time, cash, fatigue, and reputation all carry forward.
 
         ### How you're judged
-        Your performance is scored on two things — outcomes (70%) and process (30%):
+        Your performance is scored on two things · outcomes (70%) and process (30%):
 
-        **Outcomes — what you actually achieved:**
-        - **Cash management** — did you protect the firm's money or burn through it?
+        **Outcomes · what you actually achieved:**
+        - **Cash management** - did you protect the firm's money or burn through it?
           Holding cash flat earns partial credit; growing it earns full marks.
-        - **Reputation** — starts at 60. Holding it steady is solid; gaining
+        - **Reputation** - starts at 60. Holding it steady is solid; gaining
           reputation is excellent. Losing it through cancellations and missed deadlines
           will cost you.
-        - **Project completions** — projects only count if they finish properly.
+        - **Project completions** - projects only count if they finish properly.
           Quality failures and missed deadlines don't count.
-        - **Consultant fatigue** — keeping the team from burning out matters.
+        - **Consultant fatigue** - keeping the team from burning out matters.
 
-        **Process — how well you ran it:**
-        - **Constraint compliance** — did you respect skill and seniority requirements?
-        - **Skill match quality** — staffing the wrong people on a project lowers
+        **Process · how well you ran it:**
+        - **Constraint compliance** - did you respect skill and seniority requirements?
+        - **Skill match quality** - staffing the wrong people on a project lowers
           its quality multiplier and shrinks the revenue when it completes.
 
         ### What to prioritize
@@ -118,7 +118,7 @@ def _intro() -> None:
 
         ### What to look out for
         - **Two binding decisions** will interrupt the game. You can't advance until
-          you choose. Read the options carefully — they have lasting effects on
+          you choose. Read the options carefully · they have lasting effects on
           cash, reputation, and your team.
         - **Sick leave, budget cuts, and new project arrivals** will happen mid-game.
           You'll need to adapt your staffing on the fly.
@@ -128,7 +128,7 @@ def _intro() -> None:
 
         ### The clock
         You have **20 minutes total** to play through all 8 weeks. The timer runs
-        continuously — there's no per-week limit. If time runs out, remaining weeks
+        continuously · there's no per-week limit. If time runs out, remaining weeks
         auto-advance with no new staffing, which usually goes badly.
 
         Think long. A decision in Week 2 will shape what's possible in Week 6.
@@ -146,7 +146,7 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
     # Scroll to top if we just advanced a week. The script keeps retrying via
     # requestAnimationFrame for up to ~1.5s because on Streamlit Cloud the page
     # finishes painting after our injected iframe loads, so a single scroll call
-    # often misses. We also target every plausible scroll container — Streamlit
+    # often misses. We also target every plausible scroll container · Streamlit
     # has changed which one actually scrolls between versions.
     if st.session_state.pop("_scroll_top_needed", False):
         components.html(
@@ -231,7 +231,7 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
 
     st.divider()
 
-    # Week 2 decision modal (David resigns) — must be made before advancing
+    # Week 2 decision modal (David resigns) - must be made before advancing
     decision_choice_tuple = None
     pending = pending_decision_for_week(scenario, state, week)
     if pending is not None:
@@ -266,7 +266,7 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
                 tag = " 🤒 *sick this week*"
             fatigue_color = "🟢" if fatigue < 40 else ("🟡" if fatigue < 70 else "🔴")
             st.markdown(
-                f"**{c['name']}** ({c['id']}) — {c['seniority']}{tag}  \n"
+                f"**{c['name']}** ({c['id']}) - {c['seniority']}{tag}  \n"
                 f"Skills: {', '.join(c['skills'])} · €{c['daily_rate']}/day  \n"
                 f"Fatigue: {fatigue_color} {fatigue}/100"
             )
@@ -375,7 +375,7 @@ def _render_decision(decision: dict, scenario: dict) -> tuple[str, str] | None:
     st.markdown("### 📋 Decision required")
     st.warning(decision["description"])
 
-    option_labels = [f"**{opt['id'].replace('_', ' ').title()}** — {opt['label']}"
+    option_labels = [f"**{opt['id'].replace('_', ' ').title()}** - {opt['label']}"
                      for opt in decision["options"]]
     choice_display = st.radio(
         "Pick one:",
@@ -405,7 +405,7 @@ def _render_tradeoff(scenario: dict) -> str | None:
     st.markdown("### ⚠️ Trade-off decision")
     st.error(tradeoff["description"])
 
-    option_labels = [f"**{opt['id']}** — {opt['label']}" for opt in tradeoff["options"]]
+    option_labels = [f"**{opt['id']}** - {opt['label']}" for opt in tradeoff["options"]]
     choice_display = st.radio(
         "Choose one option:",
         options=option_labels,
@@ -471,12 +471,12 @@ def _finalize_and_advance(scenario: dict, state: dict, elapsed: int) -> None:
 
     st.title("Layer 2 Complete")
     st.success(
-        "You've finished the firm simulation. Moving on to the final layer — "
+        "You've finished the firm simulation. Moving on to the final layer - "
         "the AI-led interview."
     )
     st.markdown(
         """
-        **Next — Layer 3: AI-Led Interview**
+        **Next · Layer 3: AI-Led Interview**
         
         Five questions, each with a follow-up. Each answer is voice-recorded,
         transcribed, and scored on clarity, structure, relevance, and depth.

@@ -106,7 +106,7 @@ def resume_from_db(candidate: dict) -> None:
         st.session_state.l1_question_idx = 0
 
     # Layer 2: simulation is not checkpointed mid-layer. If a final result
-    # exists in the DB, the candidate already finished Layer 2 — keep them
+    # exists in the DB, the candidate already finished Layer 2 · keep them
     # past the L2 stage. If not, they'll restart the sim from Week 1.
     if db.has_layer2_simulation(cid):
         st.session_state.l2_started = True

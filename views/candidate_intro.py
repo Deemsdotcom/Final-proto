@@ -9,7 +9,7 @@ from .state import advance_stage
 
 
 # The three layers presented as a vertical journey timeline. Edit here if
-# durations or descriptions change — the welcome page picks this up
+# durations or descriptions change · the welcome page picks this up
 # automatically.
 JOURNEY = [
     {
@@ -17,7 +17,7 @@ JOURNEY = [
         "meta": "~30 min · 30 questions",
         "title": "Cognitive Assessment",
         "desc": (
-            "Three timed themes — logical, numerical, and verbal reasoning. "
+            "Three timed themes · logical, numerical, and verbal reasoning. "
             "Each question has its own time limit, and you cannot revisit "
             "an answer once it's submitted."
         ),
@@ -28,7 +28,7 @@ JOURNEY = [
         "title": "Staffing Simulation",
         "desc": (
             "Step into the shoes of a resource manager. Assign consultants "
-            "to projects under realistic constraints — a continuous "
+            "to projects under realistic constraints · a continuous "
             "20-minute timer, with a Week 6 trade-off decision."
         ),
     },
@@ -58,7 +58,7 @@ def render() -> None:
         "and we'll share personalised feedback at the end.",
     )
 
-    # ── KPI strip — at-a-glance facts before the journey ─────────────────
+    # ── KPI strip · at-a-glance facts before the journey ─────────────────
     st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
     k1, k2, k3, k4 = st.columns(4, gap="small")
     with k1:
@@ -76,7 +76,7 @@ def render() -> None:
     # ── Quiet reassurance + setup banner ─────────────────────────────────
     ui.info_banner(
         "Find a quiet spot, make sure your microphone works, and give "
-        "yourself uninterrupted time. Your progress saves automatically — "
+        "yourself uninterrupted time. Your progress saves automatically - "
         "if you close the tab, sign back in with the same email to resume.",
         icon="ℹ",
     )

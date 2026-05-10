@@ -35,12 +35,12 @@ THEME_LABELS = {
         "short": "Logical",
         "title": "Logical Reasoning",
         "subtitle": "Spot the pattern across rows and columns. Pick the figure that completes the matrix.",
-        "options": "A — E",
+        "options": "A · E",
         "setup_html": (
             "Each question shows a <strong>3×3 grid of figures</strong> with the "
             "bottom-right cell missing. The figures change across rows and columns "
             "according to a hidden rule. Your job is to work out the rule and pick "
-            "the option (A — E) that completes the grid."
+            "the option (A · E) that completes the grid."
         ),
         "pattern_tags": [
             "Shape changes", "Rotation", "Add or subtract",
@@ -52,7 +52,7 @@ THEME_LABELS = {
         ),
         "tips": [
             ("Rows first.", "The pattern often runs more obviously along rows than columns."),
-            ("Eliminate options.", "If you can\'t see the full pattern, you can usually rule out 2 — 3 options quickly."),
+            ("Eliminate options.", "If you can\'t see the full pattern, you can usually rule out 2 · 3 options quickly."),
             ("Don\'t overthink.", "After about 30 seconds of being stuck, pick your best guess and move on."),
             ("Watch the timer.", "75 seconds is plenty if you don\'t get stuck on one cell."),
         ],
@@ -61,7 +61,7 @@ THEME_LABELS = {
         "short": "Numerical",
         "title": "Numerical Reasoning",
         "subtitle": "Read a chart or table, then answer a multiple-choice question about the data.",
-        "options": "A — D",
+        "options": "A · D",
         "setup_html": (
             "Each question shows a <strong>chart or table</strong> followed by a "
             "multiple-choice question about the data. You will work with percentages, "
@@ -186,7 +186,7 @@ def _layer_overview() -> None:
             title="Numerical Reasoning",
             desc=(
                 "Short charts and tables followed by a multiple-choice "
-                "question. Percentages, ratios, growth rates — calculator "
+                "question. Percentages, ratios, growth rates · calculator "
                 "is recommended."
             ),
             stats=[(f"{QUESTIONS_PER_THEME}", "Questions"), ("90 s", "Per question")],
@@ -198,7 +198,7 @@ def _layer_overview() -> None:
             title="Verbal Reasoning",
             desc=(
                 "Read a short passage, then judge a statement: True, False, "
-                "or Cannot Say. Use only what the passage says — no outside "
+                "or Cannot Say. Use only what the passage says · no outside "
                 "knowledge."
             ),
             stats=[(f"{QUESTIONS_PER_THEME}", "Questions"), ("60 s", "Per question")],
@@ -206,14 +206,14 @@ def _layer_overview() -> None:
 
     st.markdown("<div style='height:1.25rem'></div>", unsafe_allow_html=True)
 
-    # Compact prep checklist — single full-width card
+    # Compact prep checklist · single full-width card
     with ui.card("Before you begin"):
         ui.numbered_rule(
             1, "Pen and paper for working through problems.",
             severity="info",
         )
         ui.numbered_rule(
-            2, "A calculator — the numerical theme uses percentages, ratios, and multi-step figures.",
+            2, "A calculator · the numerical theme uses percentages, ratios, and multi-step figures.",
             severity="info",
         )
         ui.numbered_rule(
@@ -221,7 +221,7 @@ def _layer_overview() -> None:
             severity="info",
         )
         ui.numbered_rule(
-            4, "A stable internet connection — your answers save automatically as you go.",
+            4, "A stable internet connection · your answers save automatically as you go.",
             severity="info",
         )
         ui.numbered_rule(
@@ -231,7 +231,7 @@ def _layer_overview() -> None:
 
     st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
     ui.info_banner(
-        "Pick the best answer for each question — you will not see whether you got each one right.",
+        "Pick the best answer for each question · you will not see whether you got each one right.",
         icon="ℹ",
     )
     st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
@@ -249,65 +249,68 @@ def _layer_overview() -> None:
 def _theme_intro(theme: str, theme_idx: int) -> None:
     """Per-theme intro shown before the first question of each theme.
 
-    Editorial layout: header, eyebrow, bold title, subtitle with inline
-    meta, then a single wide editorial card with three stacked sections
-    (Setup / Patterns / How to approach), each separated by a thin
-    divider. Info banner + full-width CTA close the page.
+    Asymmetric magazine-spread layout: a narrow editorial column on the
+    left with the theme number set in huge typography and a stack of
+    stats; a wider right column with the title, subtitle, and three
+    editorial sections (Task / Patterns / Approach). Info banner + CTA
+    close the page.
     """
     ui.inject_global_styles()
-    ui.header(meta=f"Candidate · {st.session_state.candidate_name}")
+    ui.header(meta=f"Candidate {st.session_state.candidate_name}")
 
     seconds = time_limit_for(theme)
     label = THEME_LABELS[theme]
-    total_min = (seconds * QUESTIONS_PER_THEME + 30) // 60
 
-    ui.eyebrow(f"Stage 1 of 3 · Theme {theme_idx + 1} of {len(THEMES)}")
-    ui.page_title(label["title"], label["subtitle"])
-
-    # Inline meta line directly under the subtitle
-    st.markdown(
-        '<div style="color:#A0AECB; font-size:0.95rem; margin:-0.4rem 0 1.4rem 0;">'
-        f'<span style="color:#1DB8F2; font-weight:700;">{QUESTIONS_PER_THEME} questions</span>'
-        f' &middot; {seconds} seconds each &middot; {label["options"]} options &middot; ~{total_min} min total'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-
-    # Build the three editorial sections using copy from THEME_LABELS
+    # Build the editorial sections
     tags_html = (
         '<div class="cap-edit-tags">'
-        + '<span class="tag-sep">&middot;</span>'.join(
+        + '<span class="tag-sep">·</span>'.join(
             f'<span>{t}</span>' for t in label["pattern_tags"]
         )
         + '</div>'
         + '<p class="cap-edit-note">' + label["look_for_note"] + '</p>'
     )
-
     steps_html = '<ol class="cap-edit-steps">' + "".join(
         f'<li><strong>{head}</strong> {body}</li>' for head, body in label["tips"]
     ) + '</ol>'
 
-    ui.editorial_card([
-        {
-            "eyebrow": "The setup",
-            "body_html": '<p class="cap-edit-lead">' + label["setup_html"] + '</p>',
-        },
-        {
-            "eyebrow": "Pattern types to look for" if theme == "logical" else
-                       ("What the data looks like" if theme == "numerical" else
-                        "How to read the answer choices"),
-            "body_html": tags_html,
-        },
-        {
-            "eyebrow": "How to approach it",
-            "body_html": steps_html,
-        },
-    ])
+    section_2_eyebrow = (
+        "Pattern types to look for" if theme == "logical" else
+        ("What the data looks like" if theme == "numerical" else
+         "How to read the answer choices")
+    )
+
+    ui.theme_spread(
+        eyebrow=f"Stage 1 of 3 · Theme {theme_idx + 1} of 3",
+        title=label["title"],
+        subtitle=label["subtitle"],
+        side_num=f"0{theme_idx + 1}",
+        side_eyebrow=f"Theme {theme_idx + 1} of 3",
+        stats=[
+            (str(QUESTIONS_PER_THEME), "",  "Questions"),
+            (str(seconds),              "s", "Per question"),
+            (label["options"],          "",  "Options"),
+        ],
+        sections=[
+            {
+                "eyebrow": "The task",
+                "body_html": '<p class="cap-edit-lead">' + label["setup_html"] + '</p>',
+            },
+            {
+                "eyebrow": section_2_eyebrow,
+                "body_html": tags_html,
+            },
+            {
+                "eyebrow": "How to approach it",
+                "body_html": steps_html,
+            },
+        ],
+    )
 
     ui.info_banner(
         f"{seconds} seconds per question. Time-outs count as incorrect, "
         f"and you cannot revisit a question once it's answered.",
-        icon="ℹ",
+        icon="i",
     )
     st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
 
@@ -368,14 +371,14 @@ def _render_question(
         # Big bold question stem
         ui.question_stem(question.question_text)
 
-        # Optional second image (abstract: A — E option grid)
+        # Optional second image (abstract: A · E option grid)
         if question.answer_image_path:
             try:
                 st.image(question.answer_image_path)
             except Exception:
                 pass
 
-        # Options — dynamic count, support 3 / 4 / 5
+        # Options · dynamic count, support 3 / 4 / 5
         n_opts = len(question.options)
         letters = ["A", "B", "C", "D", "E"][:n_opts]
         selection_key = f"l1_{theme}_{question_idx}_selection"
@@ -460,14 +463,14 @@ def _finish_layer(candidate_id: str) -> None:
     """All three themes done. Move on to Layer 2 with no score reveal."""
     st.title("Layer 1 Complete")
     st.success(
-        "Nice work — you've finished the cognitive assessment. Your full results "
+        "Nice work · you've finished the cognitive assessment. Your full results "
         "will be shown after you complete all three layers."
     )
 
     st.markdown(
         """
         ---
-        **Next — Layer 2: Firm Simulation**
+        **Next · Layer 2: Firm Simulation**
 
         You'll run a consulting firm for 8 simulated weeks. Assign consultants to
         projects, manage cash and reputation, and respond to events as they

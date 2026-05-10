@@ -23,7 +23,7 @@ def render() -> None:
     ui.eyebrow("Consulting Recruitment · Capgemini Invent")
     ui.page_title(
         "A focused, modern hiring experience.",
-        "Cognitive reasoning, a firm-management simulation, and an AI-led interview — "
+        "Cognitive reasoning, a firm-management simulation, and an AI-led interview - "
         "completed in one session.",
     )
 
