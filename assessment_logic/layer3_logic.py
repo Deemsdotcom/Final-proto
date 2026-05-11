@@ -55,17 +55,20 @@ Their answer:
 
 Your goal for the follow-up: {followup_goal}
 
-Pick exactly ONE of these four follow-up types based on what the candidate actually said:
+Pick exactly ONE of these five follow-up types based on what the candidate actually said:
 
 A) GET SPECIFIC, if the answer was vague or general (no concrete moment, no specific action they personally took)
 B) GET EVIDENCE, if the answer sounded prepared or abstract (no real outcome, sounds rehearsed)
 C) GET REASONING, if the answer was good but didn't explain the thinking behind their choice
 D) GET REFLECTION, if the answer described an outcome but not what they learned
+E) RE-ASK, if the candidate did NOT engage with the question at all. Use E whenever the response is: a greeting ("hi", "hello"), a question back to you ("do you hear me?", "can you repeat?", "what was the question?"), an off-topic remark, silence transcribed as a couple of filler words, OR a response that does not reference any real situation or action the candidate took. Do not stretch to fit A-D when the candidate clearly hasn't answered.
 
-The follow-up must respond directly to what they said, not a generic probe. It must be answerable in under 2 minutes.
+For A-D the follow-up must respond directly to what they said, not a generic probe, and be answerable in under 2 minutes.
+
+For E the follow-up MUST be the original question repeated verbatim - copy the question text shown above word for word. Do not paraphrase. The in-call system prepends a short reassurance like "Yes, I can hear you. Let me ask again" automatically, so you only need to return the question itself.
 
 Return ONLY a JSON object in this exact format, no preamble or markdown:
-{{"bucket": "<A|B|C|D>", "question": "<the follow-up question>"}}"""
+{{"bucket": "<A|B|C|D|E>", "question": "<the follow-up question, or the original question verbatim if bucket is E>"}}"""
 
 
 SCORING_PROMPT = """You are scoring a candidate's answer for the competency "{competency_name}" on a 0-25 scale. Be strict, evidence-based, and use the full scale. Do not compress scores toward the middle.
@@ -149,7 +152,7 @@ def generate_followup(
     competency_name: str,
     followup_goal: str,
 ) -> dict:
-    """Returns {"bucket": "A|B|C|D", "question": "..."}.
+    """Returns {"bucket": "A|B|C|D|E", "question": "..."}.
 
     On parse failure or empty transcript, returns a generic GET SPECIFIC probe.
     """
@@ -172,7 +175,7 @@ def generate_followup(
         return dict(GENERIC_FALLBACK_FOLLOWUP)
 
     bucket = str(parsed.get("bucket", "A")).strip().upper()[:1]
-    if bucket not in {"A", "B", "C", "D"}:
+    if bucket not in {"A", "B", "C", "D", "E"}:
         bucket = "A"
     question = str(parsed.get("question", "")).strip().strip('"')
     if not question:

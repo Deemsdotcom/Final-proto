@@ -47,6 +47,7 @@ def render_voice_turn(
     mic_key: str,
     *,
     speak: bool = True,
+    turn_id: str = "",
     silence_ms: int = 4000,
     hard_cap_seconds: int = 90,
     voice_hint: str = "en",
@@ -89,6 +90,7 @@ def render_voice_turn(
             silence_ms=silence_ms,
             hard_cap_seconds=hard_cap_seconds,
             voice_hint=voice_hint,
+            turn_id=turn_id,
         )
     return audio_file
 
@@ -115,6 +117,7 @@ def _render_drive_script(
     hard_cap_seconds: int,
     voice_hint: str,
     speak_only: bool = False,
+    turn_id: str = "",
 ) -> None:
     """Inject the JS that speaks the AI line and drives VAD on the recorder."""
     safe_text = json.dumps(ai_text)
@@ -123,6 +126,11 @@ def _render_drive_script(
     speak_only_flag = "true" if speak_only else "false"
     silence_ms_js = json.dumps(int(silence_ms))
     cap_ms_js = json.dumps(int(hard_cap_seconds) * 1000)
+    # turn_id is used by the JS to dedupe: if this turn's TTS has already
+    # fired in a prior iframe (Streamlit can briefly leave the old iframe
+    # alive during a rerun), the new iframe sees the same turn_id on
+    # window.parent.__capLastTurn and bails out instead of speaking again.
+    safe_turn_id = json.dumps(turn_id or uid)
 
     component_html = f"""
     <div style="margin:4px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#94a3b8;">
@@ -135,6 +143,7 @@ def _render_drive_script(
       const SPEAK_ONLY = {speak_only_flag};
       const SILENCE_MS = {silence_ms_js};
       const HARD_CAP_MS = {cap_ms_js};
+      const TURN_ID = {safe_turn_id};
       const statusEl = document.getElementById("vc_status_{uid}");
 
       let parentDoc;
@@ -186,6 +195,24 @@ def _render_drive_script(
           if (cb) cb();
           return;
         }}
+
+        // Per-turn idempotency. Streamlit can briefly keep the previous
+        // iframe alive while mounting the new one, or re-render the same
+        // iframe twice on slow browsers. Without this guard the AI line
+        // plays twice (and the recorder gets armed and immediately
+        // closed, locking the candidate out). The mark lives on
+        // window.parent so it survives iframe re-mounts.
+        try {{
+          const w = window.parent || window;
+          if (TURN_ID && w.__capLastTurn === TURN_ID) {{
+            // Already spoken for this turn. Just chain into the callback
+            // so the recorder still arms if it hasn't already.
+            if (cb) cb();
+            return;
+          }}
+          if (TURN_ID) w.__capLastTurn = TURN_ID;
+        }} catch (e) {{ /* same-origin only; ignore */ }}
+
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(TEXT);
         const v = pickVoice();
@@ -196,15 +223,26 @@ def _render_drive_script(
         utter.onstart = () => setStatus("Interviewer speaking...");
         utter.onend   = () => {{ setStatus(""); if (cb) cb(); }};
         utter.onerror = () => {{ setStatus(""); if (cb) cb(); }};
+
+        // Single-fire guard for the voices-loading race. Some browsers fire
+        // voiceschanged BEFORE the 400ms fallback timeout - without this
+        // both paths would call speak() and the utterance plays twice.
+        let speakFired = false;
+        const fireSpeak = function() {{
+          if (speakFired) return;
+          speakFired = true;
+          try {{ window.speechSynthesis.speak(utter); }} catch (e) {{}}
+        }};
+
         if (window.speechSynthesis.getVoices().length === 0) {{
           window.speechSynthesis.addEventListener(
             "voiceschanged",
-            () => window.speechSynthesis.speak(utter),
+            fireSpeak,
             {{ once: true }}
           );
-          setTimeout(() => {{ try {{ window.speechSynthesis.speak(utter); }} catch (e) {{}} }}, 400);
+          setTimeout(fireSpeak, 400);
         }} else {{
-          window.speechSynthesis.speak(utter);
+          fireSpeak();
         }}
       }}
 
@@ -325,7 +363,8 @@ def release_call_mic() -> None:
     Call this when the call ends (End call button, transition into the
     closing / scoring / done phases). Without this the browser keeps
     showing 'this tab is using your microphone' even after the candidate
-    is done.
+    is done. Also clears __capLastTurn so a re-take of the call starts
+    its own per-turn TTS dedupe state.
     """
     components.html(
         "<script>"
@@ -336,6 +375,7 @@ def release_call_mic() -> None:
         "w.__capMicStream.getTracks().forEach(function(t){try{t.stop();}catch(e){}});"
         "w.__capMicStream=null;"
         "}"
+        "w.__capLastTurn=null;"
         "if(\"speechSynthesis\" in window){window.speechSynthesis.cancel();}"
         "}catch(e){}"
         "})();"

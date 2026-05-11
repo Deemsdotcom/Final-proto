@@ -212,8 +212,15 @@ def _render_active() -> None:
     # turn_idx because mic_nonce advances together with turn_idx.
     turn_spoken_key = f"l3_spoken_turn_{turn_idx}"
     should_speak_now = not st.session_state.get(turn_spoken_key, False)
+    # Per-turn ID for the JS dedupe. mic_nonce is unique across turns
+    # AND across re-takes (it's reset on Begin call), so it makes a solid
+    # idempotency key for window.parent.__capLastTurn.
+    turn_id = f"l3_t{turn_idx}_n{st.session_state.l3_mic_nonce}"
     audio_file = render_voice_turn(
-        ai_text=ai_text, mic_key=mic_key, speak=should_speak_now
+        ai_text=ai_text,
+        mic_key=mic_key,
+        speak=should_speak_now,
+        turn_id=turn_id,
     )
     if should_speak_now:
         st.session_state[turn_spoken_key] = True
@@ -358,11 +365,15 @@ def _render_done() -> None:
 def _compose_ai_line(comp: dict, comp_idx: int, phase: str) -> str:
     """Build the exact string the AI speaks for a given turn.
 
-    Main turn: opener (Q1 only) or transition (Q2..Q5) + the verbatim
+    Main turn: opener (Q1 only) or transition (Q2..Q4) + the verbatim
     question from interview_questions.json.
 
     Follow-up turn: a short acknowledgement + the LLM-generated follow-up
-    question already stashed for this competency.
+    question already stashed for this competency. If the LLM tagged the
+    follow-up as bucket "E" (RE-ASK), the candidate clearly didn't engage
+    with the question (greeting, asked the AI a question back, off-topic
+    response), and we swap the normal acknowledgement for a short
+    reassurance and the verbatim original question.
     """
     if phase == "main":
         if comp_idx == 0:
@@ -370,6 +381,8 @@ def _compose_ai_line(comp: dict, comp_idx: int, phase: str) -> str:
         return transition_line(comp_idx) + " " + comp["question"]
     fu_obj = st.session_state.l3_followups.get(comp_idx) or {}
     fu_text = fu_obj.get("question") or "Can you tell me a bit more about that?"
+    if str(fu_obj.get("bucket", "")).upper() == "E":
+        return "Yes, I can hear you. Let me ask that again. " + fu_text
     return acknowledge_line(comp_idx) + " " + fu_text
 
 
