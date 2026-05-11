@@ -92,7 +92,7 @@
     "david_resigns": {
       "trigger_week": 2,
       "consultant_id": "C4",
-      "description": "David (C4) — Consultant, Digital + Analytics — has handed in his resignation. He gives 1 week's notice. He's been staffed on your projects so far. You must respond this week.",
+      "description": "David (C4), Consultant, Digital + Analytics, has handed in his resignation. He gives 1 week's notice. He's been staffed on your projects so far. You must respond this week.",
       "options": [
         {"id": "retain",     "label": "Counter-offer with a €40,000 retention bonus. He stays for the rest of the simulation.",      "score": 70, "effects": {"cash": -40000, "reputation": 0,  "consultant_change": "keep"}},
         {"id": "let_go",     "label": "Let him leave at the end of next week. Manage without him for the remaining 6 weeks.",         "score": 50, "effects": {"cash": 0,       "reputation": -2, "consultant_change": "leave_week_3"}},

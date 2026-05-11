@@ -1,8 +1,9 @@
 """Layer 1 view: cognitive assessment.
 
-Per-question timer (theme-specific). Uses streamlit_autorefresh to tick
-the clock every second. On expiry, submission is forced server-side
-(comparing start_time to now).
+Theme-level timer (one budget per theme block, not per question). The
+candidate sees a continuous countdown over the whole theme. When the
+theme runs out, any unanswered questions are auto-marked wrong and the
+candidate skips to the next theme intro.
 
 Renders dynamic option counts (3-5 options) and an optional answer-grid
 image for abstract reasoning questions.
@@ -20,97 +21,88 @@ from assessment_logic.layer1_logic import (
     THEMES,
     select_questions,
     theme_score,
-    time_limit_for,
+    theme_time_limit_for,
 )
 from database import db
 
-from . import _design as ui
 from .state import advance_stage
 
-# Per-theme content for _theme_intro. Keeping it module-level so the
-# render function reads as a clean layout pipeline, and so the copy can
-# be edited without touching layout code.
-THEME_LABELS = {
+
+# AI-use flagging thresholds: per-theme score >= 80% AND theme total time
+# spent <= 25% of the theme block triggers a "possible AI use" flag.
+AI_FLAG_SCORE_THRESHOLD_PCT = 80.0
+AI_FLAG_TIME_RATIO = 0.25
+
+
+# ---------------------------------------------------------------------------
+# Hardcoded example questions, one per theme. Shown on the theme intro page
+# as "Example question (not graded)" so the candidate knows what to expect.
+# These are static and do not go through the seeded random pool.
+# ---------------------------------------------------------------------------
+EXAMPLE_QUESTIONS = {
     "logical": {
-        "short": "Logical",
-        "title": "Logical Reasoning",
-        "subtitle": "Find the pattern in the sequence and pick the figure that comes next.",
-        "options": "A · E",
-        "setup_html": (
-            "Each question shows a <strong>sequence of 5 figures</strong>. The "
-            "bottom-right cell missing. The figures change across rows and columns "
-            "according to a hidden rule. Your job is to work out the rule and pick "
-            "the option (A · E) that completes the grid."
+        "stem": (
+            "Which of the five figures (A–E) continues the sequence shown above?"
         ),
-        "pattern_tags": [
-            "Shape changes", "Rotation", "Add or subtract",
-            "Counting", "Color &amp; shading",
+        # First image shows the sequence (dots accumulating in a pattern),
+        # second image shows the A-E options to choose from.
+        "sequence_image": "data/charts/example_logical_sequence.png",
+        "options_image": "data/charts/example_logical_options.png",
+        "options": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
         ],
-        "look_for_note": (
-            "Patterns can combine multiple rules. Track how each figure changes "
-            "from one step to the next, then project that change forward."
+        "correct": "A",
+        "explanation": (
+            "Each frame adds one dot following a consistent diagonal pattern "
+            "from the top-left corner. Option A continues that progression."
         ),
-        "tips": [
-            ("Rows first.", "The pattern often runs more obviously along rows than columns."),
-            ("Eliminate options.", "If you can\'t see the full pattern, you can usually rule out 2 · 3 options quickly."),
-            ("Don\'t overthink.", "After about 30 seconds of being stuck, pick your best guess and move on."),
-            ("Watch the timer.", "75 seconds is plenty if you don\'t get stuck on one cell."),
-        ],
     },
     "numerical": {
-        "short": "Numerical",
-        "title": "Numerical Reasoning",
-        "subtitle": "Read a chart or table, then answer a multiple-choice question about the data.",
-        "options": "A · D",
-        "setup_html": (
-            "Each question shows a <strong>chart or table</strong> followed by a "
-            "multiple-choice question about the data. You will work with percentages, "
-            "ratios, growth rates, and multi-step calculations. Use a calculator."
+        "stem": (
+            "It was estimated that it took editing companies approximately 3 "
+            "minutes per minute of final movie time. If 87% of each thriller "
+            "movie was looked into by editing companies, how many minutes on "
+            "average did they spend on it in 2004?"
         ),
-        "pattern_tags": [
-            "Percentages", "Ratios", "Growth rates",
-            "Table reading", "Multi-step sums",
+        "chart_image": "data/charts/example_numerical.png",
+        "options": [
+            "A) 425 minutes",
+            "B) 260 minutes",
+            "C) 140 minutes",
+            "D) 47 minutes",
+            "E) 3 minutes",
         ],
-        "look_for_note": (
-            "Wrong answers are usually plausible-looking traps based on misreading "
-            "axes, units, or which row of the table the question refers to."
+        "correct": "A",
+        "explanation": (
+            "Thriller 2004 average length is 163 minutes. 87% of 163 ≈ 141.81 "
+            "minutes of footage reviewed. At 3 editing minutes per movie "
+            "minute, that's 141.81 × 3 ≈ 425 minutes."
         ),
-        "tips": [
-            ("Read carefully.", "Check axes, units, and which row or column the question refers to."),
-            ("Use the calculator.", "Don\'t try to do percentages or ratios in your head under time pressure."),
-            ("Estimate first.", "A rough estimate helps you spot when an answer choice is way off."),
-            ("Skip and return.", "If a calculation is taking too long, guess and move on."),
-        ],
     },
     "verbal": {
-        "short": "Verbal",
-        "title": "Verbal Reasoning",
-        "subtitle": "Read the passage, then judge the statement: True, False, or Cannot Say.",
-        "options": "3 choices",
-        "setup_html": (
-            "Each question shows a <strong>short passage</strong> followed by a "
-            "statement. You choose <strong>True</strong> if the statement follows "
-            "from the passage, <strong>False</strong> if it contradicts the passage, "
-            "or <strong>Cannot Say</strong> if the passage does not give you enough "
-            "information to decide."
+        "stem": (
+            "**Passage:** The decision must be notified in writing within "
+            "fourteen days of the hearing.\n\n"
+            "**Statement:** A notification given orally would not satisfy the "
+            "requirement."
         ),
-        "pattern_tags": [
-            "True", "False", "Cannot Say",
+        "options": [
+            "A) True",
+            "B) False",
+            "C) Cannot Say",
         ],
-        "look_for_note": (
-            "Use only what the passage says. If outside knowledge or common sense "
-            "would be required to decide, the answer is almost always Cannot Say."
+        "correct": "A",
+        "explanation": (
+            "The passage explicitly requires the decision to be notified *in "
+            "writing*. An oral notification therefore fails to meet the stated "
+            "requirement, so the statement is True."
         ),
-        "tips": [
-            ("Stay literal.", "Don\'t bring outside knowledge or assumptions into the passage."),
-            ("Watch qualifiers.", "Words like &lsquo;all&rsquo;, &lsquo;always&rsquo;, &lsquo;never&rsquo;, &lsquo;most&rsquo; often determine the answer."),
-            ("Default to Cannot Say.", "If the passage does not directly address the statement, that is your answer."),
-            ("Re-read the relevant sentence.", "Faster than re-reading the whole passage."),
-        ],
     },
 }
-
-
 
 
 def render() -> None:
@@ -149,320 +141,288 @@ def render() -> None:
 
 
 def _layer_overview() -> None:
-    """Layer 1 overview shown once before the first theme intro.
+    """Layer 1 overview shown once before the first theme intro."""
+    st.title("Layer 1: Cognitive Assessment")
+    st.markdown(
+        f"""
+        Layer 1 has three themes you'll work through in order:
 
-    Three theme hero cards across the top (Logical · Numerical · Verbal),
-    each with its own inline SVG illustration and stat strip. A compact
-    "Before you begin" prep card below, then info banner + CTA.
-    """
-    ui.inject_global_styles()
-    ui.header(meta=f"Candidate · {st.session_state.candidate_name}")
+        1. **Logical Reasoning**: abstract sequence puzzles. You'll see a
+           row of figures and pick the one that comes next in the pattern.
+        2. **Numerical Reasoning**: short charts and tables, followed by a
+           multiple-choice question about the data.
+        3. **Verbal Reasoning**: a short passage followed by a statement.
+           You decide whether the statement is **True**, **False**, or
+           **Cannot Say** based only on the passage.
 
-    ui.eyebrow("Stage 1 of 3 · Cognitive Assessment")
-    ui.page_title(
-        "Three reasoning themes, one timed sprint",
-        "About 30 minutes total. Each theme has its own time limit per question.",
+        Each theme has **{QUESTIONS_PER_THEME} questions** and its own
+        **time block, not a per-question timer**. The clock runs continuously
+        over the whole theme. When the theme block ends, any unanswered
+        questions are marked wrong and you move on to the next theme.
+        **You cannot revisit questions once answered.**
+
+        ### Before you begin, please make sure you have:
+        - 📝 **Pen and paper** for working through problems
+        - 🧮 **A calculator** (the numerical theme requires arithmetic on
+          percentages, ratios, and multi-step figures)
+        - 🪑 A quiet, uninterrupted environment for the next ~35 minutes
+
+        Pick the best answer; you will not see whether you got each
+        question right.
+
+        - **Don't overthink it.** If you've stared for 30 seconds and nothing
+          clicks, pick your best guess and move on. Wrong answers cost the
+          same as no answer, and no answer is guaranteed wrong.
+        """
     )
-
-    st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
-
-    # Three theme hero cards
-    c1, c2, c3 = st.columns(3, gap="medium")
-    with c1:
-        ui.theme_card(
-            icon_svg=ui.THEME_ICON_LOGICAL,
-            meta="Theme 1",
-            title="Logical Reasoning",
-            desc=(
-                "Figure sequences. Spot how each figure changes from one to the next, "
-                "then pick the one that comes next."
-            ),
-            stats=[(f"{QUESTIONS_PER_THEME}", "Questions"), ("75 s", "Per question")],
-        )
-    with c2:
-        ui.theme_card(
-            icon_svg=ui.THEME_ICON_NUMERICAL,
-            meta="Theme 2",
-            title="Numerical Reasoning",
-            desc=(
-                "Short charts and tables followed by a multiple-choice "
-                "question. Percentages, ratios, growth rates · calculator "
-                "is recommended."
-            ),
-            stats=[(f"{QUESTIONS_PER_THEME}", "Questions"), ("90 s", "Per question")],
-        )
-    with c3:
-        ui.theme_card(
-            icon_svg=ui.THEME_ICON_VERBAL,
-            meta="Theme 3",
-            title="Verbal Reasoning",
-            desc=(
-                "Read a short passage, then judge a statement: True, False, "
-                "or Cannot Say. Use only what the passage says · no outside "
-                "knowledge."
-            ),
-            stats=[(f"{QUESTIONS_PER_THEME}", "Questions"), ("60 s", "Per question")],
-        )
-
-    st.markdown("<div style='height:1.25rem'></div>", unsafe_allow_html=True)
-
-    # Compact prep checklist · single full-width card
-    with ui.card("Before you begin"):
-        ui.numbered_rule(
-            1, "Pen and paper for working through problems.",
-            severity="info",
-        )
-        ui.numbered_rule(
-            2, "A calculator · the numerical theme uses percentages, ratios, and multi-step figures.",
-            severity="info",
-        )
-        ui.numbered_rule(
-            3, "A quiet, uninterrupted environment for the next ~30 minutes.",
-            severity="info",
-        )
-        ui.numbered_rule(
-            4, "A stable internet connection · your answers save automatically as you go.",
-            severity="info",
-        )
-        ui.numbered_rule(
-            5, "Time-outs count as incorrect, and answered questions cannot be revisited.",
-            severity="info",
-        )
-
-    st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
-    ui.info_banner(
-        "Pick the best answer for each question · you will not see whether you got each one right.",
-        icon="ℹ",
-    )
-    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
-
-    if st.button(
-        "Continue to Logical Reasoning",
-        type="primary",
-        use_container_width=True,
-        key="l1_overview_continue",
-    ):
+    if st.button("Continue to Logical Reasoning", type="primary"):
         st.session_state.l1_overview_seen = True
         st.rerun()
 
 
+def _render_example(theme: str) -> None:
+    """Render a small example question box on the theme intro page."""
+    ex = EXAMPLE_QUESTIONS.get(theme)
+    if not ex:
+        return
+    with st.container(border=True):
+        st.markdown("**Example question (not graded)**")
+
+        # Logical: sequence image first, then the question text, then the A-E options image.
+        if theme == "logical":
+            seq_path = ex.get("sequence_image")
+            if seq_path:
+                try:
+                    st.image(seq_path)
+                except Exception:
+                    pass
+            st.markdown(ex["stem"])
+            opts_path = ex.get("options_image")
+            if opts_path:
+                try:
+                    st.image(opts_path)
+                except Exception:
+                    pass
+        # Numerical: chart image first, then the question text.
+        elif theme == "numerical":
+            chart_path = ex.get("chart_image")
+            if chart_path:
+                try:
+                    st.image(chart_path)
+                except Exception:
+                    pass
+            st.markdown(ex["stem"])
+        # Verbal: just the passage and statement, no image.
+        else:
+            st.markdown(ex["stem"])
+
+        for opt in ex["options"]:
+            # Letter is whatever comes before ')' if present, otherwise the
+            # whole string (used by the logical example which only shows
+            # letters because the options are in an image).
+            letter = opt.split(")", 1)[0].strip() if ")" in opt else opt.strip()
+            if letter == ex["correct"]:
+                st.markdown(f"- ✅ **{opt}**  *(correct)*")
+            else:
+                st.markdown(f"- {opt}")
+        st.markdown(f"*Why: {ex['explanation']}*")
+
+
 def _theme_intro(theme: str, theme_idx: int) -> None:
-    """Per-theme intro shown before the first question of each theme.
+    st.title(f"Layer 1: {theme.capitalize()} Reasoning")
+    st.caption(f"Theme {theme_idx + 1} of {len(THEMES)}")
 
-    Asymmetric magazine-spread layout: a narrow editorial column on the
-    left with the theme number set in huge typography and a stack of
-    stats; a wider right column with the title, subtitle, and three
-    editorial sections (Task / Patterns / Approach). Info banner + CTA
-    close the page.
-    """
-    ui.inject_global_styles()
-    ui.header(meta=f"Candidate {st.session_state.candidate_name}")
+    total_seconds = theme_time_limit_for(theme)
+    minutes = total_seconds // 60
+    leftover_secs = total_seconds % 60
+    if leftover_secs == 0:
+        time_label = f"{minutes} minutes"
+    else:
+        time_label = f"{minutes} minutes {leftover_secs} seconds"
+    seconds_per_q = total_seconds // QUESTIONS_PER_THEME
 
-    seconds = time_limit_for(theme)
-    label = THEME_LABELS[theme]
+    if theme == "logical":
+        st.markdown(
+            """
+            The figures change from left to right according to a pattern:
+            rotation, shape changes, additions, counting, or shading. Work
+            out the pattern, then pick the option (A-E) that comes next.
 
-    # Build the editorial sections
-    tags_html = (
-        '<div class="cap-edit-tags">'
-        + '<span class="tag-sep">·</span>'.join(
-            f'<span>{t}</span>' for t in label["pattern_tags"]
+            ### How the patterns work
+
+            Patterns can involve any combination of:
+            - **Shape changes**: squares to triangles, open to filled, etc.
+            - **Rotation**: figures turning each step
+            - **Addition or subtraction**: elements appearing or
+              disappearing across the sequence
+            - **Counting**: number of dots, lines, or shapes increasing
+              or decreasing
+            - **Color or shading**: alternating, inverting, or combining
+
+            ### Tips before you start
+
+            - **Look at the change between adjacent figures first.** The
+              step-by-step rule is usually easier to spot than the whole
+              pattern at once.
+            - **Eliminate impossible options.** Even if you can't see the
+              full pattern, you can usually rule out 2-3 options quickly.
+            """
         )
-        + '</div>'
-        + '<p class="cap-edit-note">' + label["look_for_note"] + '</p>'
-    )
-    steps_html = '<ol class="cap-edit-steps">' + "".join(
-        f'<li><strong>{head}</strong> {body}</li>' for head, body in label["tips"]
-    ) + '</ol>'
+    elif theme == "numerical":
+        st.markdown(
+            """
+            Each question shows a **chart or table**, followed by a
+            multiple-choice question about the data. You'll need to do
+            arithmetic on percentages, ratios, growth rates, and similar.
 
-    total_min = (seconds * QUESTIONS_PER_THEME + 30) // 60
-
-    pills_html = (
-        '<div class="cap-feat-pills">'
-        + "".join(
-            f'<span class="cap-feat-pill">{t}</span>'
-            for t in label["pattern_tags"]
+            Use your calculator. Read the question carefully. The wrong
+            answers are usually plausible-looking traps based on misreading
+            axes, units, or which row or column to use.
+            """
         )
-        + "</div>"
-    )
+    elif theme == "verbal":
+        st.markdown(
+            """
+            Each question shows a **short passage** followed by a
+            **statement**. You'll choose one of three options:
 
-    # Trim tips to the top 3 for the right-hand mini card; they appear in
-    # full in the editorial copy below if we ever bring it back.
-    tips_short_html = (
-        '<ol class="cap-feat-tips">'
-        + "".join(
-            f'<li><strong>{head}</strong>{body}</li>'
-            for head, body in label["tips"][:3]
+            - **True**: the statement follows logically from the passage.
+            - **False**: the statement contradicts the passage.
+            - **Cannot Say**: the passage doesn't give you enough
+              information to decide either way.
+
+            **Important:** answer based only on what the passage says.
+            Don't use outside knowledge, common sense, or assumptions about
+            what "should" be true. If the passage doesn't address it
+            directly, the answer is almost always **Cannot Say**.
+            """
         )
-        + "</ol>"
+
+    st.divider()
+    _render_example(theme)
+    st.divider()
+
+    st.markdown(
+        f"You have **{time_label}** total for this theme, across "
+        f"{QUESTIONS_PER_THEME} questions. That's roughly "
+        f"**{seconds_per_q} seconds per question**. Manage your time. The "
+        f"timer runs continuously; it does not reset between questions."
     )
 
-    format_stats_html = (
-        '<div class="cap-feat-stats">'
-        f'<div class="cap-feat-stat-line"><span class="cap-feat-stat-num">{QUESTIONS_PER_THEME}</span><span class="cap-feat-stat-label">Questions</span></div>'
-        f'<div class="cap-feat-stat-line"><span class="cap-feat-stat-num">{seconds}s</span><span class="cap-feat-stat-label">Per question</span></div>'
-        f'<div class="cap-feat-stat-line"><span class="cap-feat-stat-num">~{total_min} min</span><span class="cap-feat-stat-label">Total time</span></div>'
-        '</div>'
-    )
-
-    watch_eyebrow = (
-        "Pattern types to look for" if theme == "logical" else
-        ("What the data looks like" if theme == "numerical" else
-         "Possible answers")
-    )
-
-    ui.theme_spread(
-        eyebrow=f"Theme {theme_idx + 1} of 3",
-        title=label["title"],
-        subtitle=label["subtitle"],
-        side_num=f"0{theme_idx + 1}",
-        side_eyebrow=f"Theme {theme_idx + 1} of 3",
-        stats=[
-            (str(QUESTIONS_PER_THEME), "",  "Questions"),
-            (str(seconds),              "s", "Per question"),
-            (label["options"],          "",  "Options"),
-        ],
-        features=[
-            {
-                "eyebrow": "The task",
-                "body_html": '<p class="cap-feat-body">' + label["setup_html"] + '</p>',
-            },
-            {
-                "eyebrow": "The format",
-                "body_html": format_stats_html,
-            },
-            {
-                "eyebrow": watch_eyebrow,
-                "body_html": pills_html + '<p class="cap-feat-body" style="margin-top:0.7rem;color:var(--cap-text-secondary,#A0AECB);font-size:var(--cap-text-body-sm);">' + label["look_for_note"] + '</p>',
-            },
-            {
-                "eyebrow": "Top strategy",
-                "body_html": tips_short_html,
-            },
-        ],
-    )
-
-    ui.info_banner(
-        f"{seconds} seconds per question. Time-outs count as incorrect, "
-        f"and you cannot revisit a question once it's answered.",
-        icon="i",
-    )
-    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
-
-    if st.button(
-        f"Begin {label['short']} Theme",
-        type="primary",
-        use_container_width=True,
-        key=f"l1_theme_{theme}_begin",
-    ):
+    if st.button(f"Begin {theme.capitalize()} Theme", type="primary"):
         st.session_state[f"l1_{theme}_started"] = True
+        # Theme-level clock starts now.
+        st.session_state[f"l1_theme_started_at_{theme}"] = time.time()
+        # Per-question wall-clock timer also starts here for the first question.
         st.session_state.l1_question_started_at = time.time()
         st.rerun()
+
+
+def _theme_remaining_seconds(theme: str) -> int:
+    """Seconds left in the current theme's time block."""
+    started_at = st.session_state.get(f"l1_theme_started_at_{theme}")
+    if started_at is None:
+        return theme_time_limit_for(theme)
+    elapsed = time.time() - started_at
+    return max(0, int(theme_time_limit_for(theme) - elapsed))
+
 
 def _render_question(
     candidate_id: str, theme: str, theme_idx: int, question_idx: int,
     question, total: int,
 ) -> None:
-    """Render one Layer 1 question with the standardised typography +
-    a sharp header bar (eyebrow + progress rail + countdown timer pill)
-    and a properly-sized question stem.
-    """
-    seconds = time_limit_for(theme)
+    theme_total = theme_time_limit_for(theme)
 
     # Tick every second
     st_autorefresh(interval=1000, key=f"l1_tick_{theme}_{question_idx}")
 
-    started_at = st.session_state.l1_question_started_at or time.time()
+    # Per-question wall clock (used for DB time_taken_seconds, not surfaced).
     if st.session_state.l1_question_started_at is None:
-        st.session_state.l1_question_started_at = started_at
+        st.session_state.l1_question_started_at = time.time()
+    q_started_at = st.session_state.l1_question_started_at
 
-    elapsed = time.time() - started_at
-    remaining = max(0, int(seconds - elapsed))
+    # Theme-level remaining time (the visible timer)
+    remaining = _theme_remaining_seconds(theme)
 
-    # ── Page chrome + header bar ─────────────────────────────────────────
-    ui.inject_global_styles()
-    ui.header(meta=f"Candidate · {st.session_state.candidate_name}")
+    # Header
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.markdown(f"**Layer 1: {theme.capitalize()} Reasoning**")
+        st.progress((question_idx) / total, text=f"Question {question_idx + 1} of {total}")
+    with col2:
+        green_cut = theme_total // 3
+        yellow_cut = theme_total // 6
+        color = "🟢" if remaining > green_cut else ("🟡" if remaining > yellow_cut else "🔴")
+        mins, secs = divmod(remaining, 60)
+        st.metric("Theme time left", f"{color} {mins:02d}:{secs:02d}")
 
-    label = THEME_LABELS[theme]
-    ui.question_progress_bar(
-        idx=question_idx,
-        total=total,
-        remaining=remaining,
-        seconds=seconds,
-        eyebrow_text=(
-            f"{label['title']} · Question {question_idx + 1} of {total}"
-        ),
+    st.divider()
+
+    # If the theme already ran out, auto-mark all remaining questions wrong.
+    if remaining <= 0:
+        _force_finish_theme_on_timeout(candidate_id, theme, question_idx)
+        return
+
+    # Main image (chart, sequence, etc.)
+    if question.chart_path:
+        try:
+            st.image(question.chart_path)
+        except Exception:
+            pass
+
+    st.markdown(f"### {question.question_text}")
+
+    # Optional second image (abstract: A-E option grid)
+    if question.answer_image_path:
+        try:
+            st.image(question.answer_image_path)
+        except Exception:
+            pass
+
+    # Options. Dynamic count, support 3/4/5.
+    n_opts = len(question.options)
+    letters = ["A", "B", "C", "D", "E"][:n_opts]
+    selection_key = f"l1_{theme}_{question_idx}_selection"
+
+    # Letter-only rendering is reserved for abstract-reasoning items where
+    # the letters are baked into the answer-grid image. Everything else
+    # (including verbal True/False/Cannot Say) shows the option text.
+    use_letter_only = question.locked and question.answer_image_path is not None
+
+    if use_letter_only:
+        display = [f"**{letters[i]}**" for i in range(n_opts)]
+    else:
+        display = [opt for opt in question.options]
+
+    choice_display = st.radio(
+        "Select one:",
+        options=display,
+        key=selection_key,
+        index=None,
+        horizontal=use_letter_only,
+    )
+    chosen_letter = None
+    if choice_display is not None:
+        chosen_letter = letters[display.index(choice_display)]
+
+    submit_clicked = st.button(
+        "Submit answer",
+        type="primary",
+        disabled=(chosen_letter is None),
+        key=f"submit_{theme}_{question_idx}",
     )
 
-    # ── Question card ────────────────────────────────────────────────────
-    with ui.card(None):
-        # Optional question image (chart/figure/sequence)
-        if question.chart_path:
-            try:
-                st.image(question.chart_path)
-            except Exception:
-                pass
-
-        # Big bold question stem
-        ui.question_stem(question.question_text)
-
-        # Optional second image (abstract: A · E option grid)
-        if question.answer_image_path:
-            try:
-                st.image(question.answer_image_path)
-            except Exception:
-                pass
-
-        # Options · dynamic count, support 3 / 4 / 5
-        n_opts = len(question.options)
-        letters = ["A", "B", "C", "D", "E"][:n_opts]
-        selection_key = f"l1_{theme}_{question_idx}_selection"
-
-        # Letter-only rendering is reserved for abstract-reasoning items
-        # where the letters are baked into the answer-grid image.
-        use_letter_only = question.locked and question.answer_image_path is not None
-
-        if use_letter_only:
-            display = [f"**{letters[i]}**" for i in range(n_opts)]
-        else:
-            display = [opt for opt in question.options]
-
-        choice_display = st.radio(
-            "Select one:",
-            options=display,
-            key=selection_key,
-            index=None,
-            horizontal=use_letter_only,
-            label_visibility="collapsed",
-        )
-        chosen_letter = None
-        if choice_display is not None:
-            chosen_letter = letters[display.index(choice_display)]
-
-        st.markdown(
-            '<div class="cap-q-submit-spacer"></div>',
-            unsafe_allow_html=True,
-        )
-
-        # Auto-submit on timeout OR manual submit
-        submit_clicked = st.button(
-            "Submit answer",
-            type="primary",
-            disabled=(chosen_letter is None),
-            key=f"submit_{theme}_{question_idx}",
-            use_container_width=True,
-        )
-        timed_out = remaining <= 0
-
-    if submit_clicked or timed_out:
+    if submit_clicked:
+        elapsed_on_q = int(time.time() - q_started_at)
         _save_and_advance(
             candidate_id, theme, theme_idx, question_idx, question,
-            chosen_letter, int(elapsed), timed_out, seconds,
+            chosen_letter, elapsed_on_q, timed_out=False,
         )
+
 
 def _save_and_advance(
     candidate_id: str, theme: str, theme_idx: int, question_idx: int,
     question, chosen_letter: str | None, elapsed: int, timed_out: bool,
-    seconds: int,
 ) -> None:
     is_correct = (chosen_letter == question.correct_option)
     db.save_layer1_result(
@@ -474,19 +434,66 @@ def _save_and_advance(
         correct_option=question.correct_option,
         candidate_answer=chosen_letter,
         is_correct=is_correct,
-        time_taken_seconds=min(elapsed, seconds),
+        time_taken_seconds=max(0, int(elapsed)),
     )
 
-    # reset timer for next question
+    # Reset per-question wall clock for the next question.
     st.session_state.l1_question_started_at = time.time()
     st.session_state.l1_question_idx = question_idx + 1
     st.rerun()
 
 
+def _force_finish_theme_on_timeout(
+    candidate_id: str, theme: str, current_question_idx: int,
+) -> None:
+    """Theme timer hit zero. Mark every remaining unanswered question wrong
+    (candidate_answer=None, is_correct=0) and advance straight to the next
+    theme intro. Skips re-saving questions that already have a row in the DB.
+    """
+    questions = st.session_state.l1_questions_cache.get(theme, [])
+
+    existing = {
+        r["question_id"]
+        for r in db.get_layer1_results(candidate_id)
+        if r["theme"] == theme
+    }
+
+    for idx in range(current_question_idx, len(questions)):
+        q = questions[idx]
+        if q.question_id in existing:
+            continue
+        db.save_layer1_result(
+            candidate_id=candidate_id,
+            theme=theme,
+            question_id=q.question_id,
+            question_text=q.question_text,
+            options_shown=q.options,
+            correct_option=q.correct_option,
+            candidate_answer=None,
+            is_correct=False,
+            time_taken_seconds=theme_time_limit_for(theme),
+        )
+
+    st.warning(
+        f"⏰ Time's up on the {theme.capitalize()} theme. Moving on to the next theme."
+    )
+    _finish_theme(candidate_id, theme)
+
+
 def _finish_theme(candidate_id: str, theme: str) -> None:
     rows = [r for r in db.get_layer1_results(candidate_id) if r["theme"] == theme]
     correct = sum(1 for r in rows if r["is_correct"])
-    st.session_state.l1_theme_scores[theme] = theme_score(correct, QUESTIONS_PER_THEME)
+    score_pct = theme_score(correct, QUESTIONS_PER_THEME)
+    st.session_state.l1_theme_scores[theme] = score_pct
+
+    # AI-use flag: high score plus very fast finish on this theme.
+    theme_total_time = sum(int(r.get("time_taken_seconds") or 0) for r in rows)
+    flag = (
+        score_pct >= AI_FLAG_SCORE_THRESHOLD_PCT
+        and theme_total_time <= int(theme_time_limit_for(theme) * AI_FLAG_TIME_RATIO)
+    )
+    st.session_state[f"l1_ai_flag_{theme}"] = bool(flag)
+
     st.session_state.l1_theme_idx += 1
     st.session_state.l1_question_idx = 0
     st.session_state.l1_question_started_at = None
@@ -497,14 +504,14 @@ def _finish_layer(candidate_id: str) -> None:
     """All three themes done. Move on to Layer 2 with no score reveal."""
     st.title("Layer 1 Complete")
     st.success(
-        "Nice work · you've finished the cognitive assessment. Your full results "
+        "Nice work, you've finished the cognitive assessment. Your full results "
         "will be shown after you complete all three layers."
     )
 
     st.markdown(
         """
         ---
-        **Next · Layer 2: Firm Simulation**
+        **Next: Layer 2 (Firm Simulation)**
 
         You'll run a consulting firm for 8 simulated weeks. Assign consultants to
         projects, manage cash and reputation, and respond to events as they

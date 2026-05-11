@@ -20,5 +20,5 @@ from .db import (
     get_all_completed_candidates,
     verify_recruiter,
     DEFAULT_RECRUITER_USERNAME,
-    get_recruiter_password,
+    DEFAULT_RECRUITER_PASSWORD,
 )

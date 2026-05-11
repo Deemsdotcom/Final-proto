@@ -2,20 +2,20 @@
 
 Combines the three layer scores into an overall score, maps competencies,
 and classifies top-fit candidates.
+
+Top Fit is now a single rule: overall >= 70. The earlier multi-criteria
+(no layer below 60, >=2 competencies >=75) was dropped in v7.
 """
 
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Optional
 
 LAYER1_WEIGHT = 0.30
 LAYER2_WEIGHT = 0.35
 LAYER3_WEIGHT = 0.35
 
 TOP_FIT_MIN_OVERALL = 70
-TOP_FIT_MIN_LAYER = 60
-TOP_FIT_HIGH_COMPETENCY_THRESHOLD = 75
-TOP_FIT_MIN_HIGH_COMPETENCIES = 2
 
 
 def overall_score(layer1: float, layer2: float, layer3: float) -> float:
@@ -28,28 +28,18 @@ def overall_score(layer1: float, layer2: float, layer3: float) -> float:
 
 def classify_top_fit(
     overall: float,
-    layer1: float,
-    layer2: float,
-    layer3: float,
-    competencies: dict,
+    layer1: Optional[float] = None,
+    layer2: Optional[float] = None,
+    layer3: Optional[float] = None,
+    competencies: Optional[dict] = None,
 ) -> int:
     """Returns 1 if top-fit, 0 otherwise.
-    
-    Requirements (all must hold):
-      - overall >= 70
-      - no single layer score below 60
-      - at least 2 competencies >= 75
+
+    Single rule (v7): overall >= 70. Extra parameters are accepted for
+    backward compatibility with callers that still pass layer scores and
+    competencies, but they're ignored.
     """
-    if overall < TOP_FIT_MIN_OVERALL:
-        return 0
-    if min(layer1, layer2, layer3) < TOP_FIT_MIN_LAYER:
-        return 0
-    high_count = sum(
-        1 for v in competencies.values() if v is not None and v >= TOP_FIT_HIGH_COMPETENCY_THRESHOLD
-    )
-    if high_count < TOP_FIT_MIN_HIGH_COMPETENCIES:
-        return 0
-    return 1
+    return 1 if overall >= TOP_FIT_MIN_OVERALL else 0
 
 
 def assemble_final_scores(
@@ -62,11 +52,17 @@ def assemble_final_scores(
     l3_comp: dict,
     candidate_feedback: str,
     recruiter_summary: str,
+    ai_flags: Optional[dict] = None,
 ) -> dict:
-    """Build the dict that goes into final_scores."""
+    """Build the dict that goes into final_scores.
+
+    ai_flags (optional) maps:
+      ai_flag_logical, ai_flag_numerical, ai_flag_verbal, ai_flag_layer2
+    to 0/1 ints. Missing keys default to 0.
+    """
     overall = overall_score(layer1, layer2, layer3)
-    competencies = {**l1_comp, **l2_comp, **l3_comp}
-    top_fit = classify_top_fit(overall, layer1, layer2, layer3, competencies)
+    top_fit = classify_top_fit(overall)
+    flags = ai_flags or {}
     return {
         "candidate_id": candidate_id,
         "layer1_score": layer1,
@@ -78,12 +74,14 @@ def assemble_final_scores(
         "competency_verbal": l1_comp.get("competency_verbal"),
         "competency_strategic": l2_comp.get("competency_strategic"),
         "competency_adaptability": l2_comp.get("competency_adaptability"),
-        "competency_l3_proactivity": l3_comp.get("competency_l3_proactivity"),
-        "competency_l3_learning_mindset": l3_comp.get("competency_l3_learning_mindset"),
-        "competency_l3_growth_driven_mindset": l3_comp.get("competency_l3_growth_driven_mindset"),
+        "competency_l3_growth_mindset": l3_comp.get("competency_l3_growth_mindset"),
         "competency_l3_adaptability": l3_comp.get("competency_l3_adaptability"),
         "competency_l3_collaboration": l3_comp.get("competency_l3_collaboration"),
         "competency_l3_self_reflection": l3_comp.get("competency_l3_self_reflection"),
+        "ai_flag_logical": int(bool(flags.get("ai_flag_logical", 0))),
+        "ai_flag_numerical": int(bool(flags.get("ai_flag_numerical", 0))),
+        "ai_flag_verbal": int(bool(flags.get("ai_flag_verbal", 0))),
+        "ai_flag_layer2": int(bool(flags.get("ai_flag_layer2", 0))),
         "top_fit": top_fit,
         "recruiter_summary": recruiter_summary,
         "candidate_feedback": candidate_feedback,

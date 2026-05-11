@@ -75,6 +75,15 @@ def _compute_and_persist(candidate_id: str) -> None:
         ]
         layer3, l3_comp = aggregate_layer3(competency_scores)
 
+        # Pull AI flags from session state (set by Layer 1 finish and Layer 2 finalize).
+        # These are informational only and don't affect any score.
+        ai_flags = {
+            "ai_flag_logical": int(bool(st.session_state.get("l1_ai_flag_logical", False))),
+            "ai_flag_numerical": int(bool(st.session_state.get("l1_ai_flag_numerical", False))),
+            "ai_flag_verbal": int(bool(st.session_state.get("l1_ai_flag_verbal", False))),
+            "ai_flag_layer2": int(bool(st.session_state.get("l2_ai_flag", False))),
+        }
+
         # Assemble (placeholder feedback first, then generate)
         draft = assemble_final_scores(
             candidate_id=candidate_id,
@@ -82,6 +91,7 @@ def _compute_and_persist(candidate_id: str) -> None:
             l1_comp=l1_comp, l2_comp=l2_comp, l3_comp=l3_comp,
             candidate_feedback="",
             recruiter_summary="",
+            ai_flags=ai_flags,
         )
 
     with st.spinner("Generating personalized feedback..."):
@@ -113,7 +123,7 @@ def _render_candidate_view(scores: dict) -> None:
     st.subheader("Layer breakdown")
     bar = go.Figure()
     bar.add_trace(go.Bar(
-        x=["Layer 1 · Cognitive", "Layer 2 · Staffing", "Layer 3 · Interview"],
+        x=["Layer 1 (Cognitive)", "Layer 2 (Staffing)", "Layer 3 (Interview)"],
         y=[scores["layer1_score"], scores["layer2_score"], scores["layer3_score"]],
         marker_color=["#3B82F6", "#10B981", "#F59E0B"],
         text=[f"{scores['layer1_score']:.0f}",
@@ -134,7 +144,7 @@ def _render_candidate_view(scores: dict) -> None:
     comp_labels = [
         "Analytical", "Numerical", "Verbal",
         "Strategic", "Adaptability (sim)",
-        "Proactivity", "Learning Mindset", "Adaptability (interview)",
+        "Growth Mindset", "Adaptability (interview)",
         "Collaboration", "Self-Reflection",
     ]
     comp_values = [
@@ -143,8 +153,7 @@ def _render_candidate_view(scores: dict) -> None:
         scores.get("competency_verbal") or 0,
         scores.get("competency_strategic") or 0,
         scores.get("competency_adaptability") or 0,
-        scores.get("competency_l3_proactivity") or 0,
-        scores.get("competency_l3_learning_mindset") or 0,
+        scores.get("competency_l3_growth_mindset") or 0,
         scores.get("competency_l3_adaptability") or 0,
         scores.get("competency_l3_collaboration") or 0,
         scores.get("competency_l3_self_reflection") or 0,
@@ -167,15 +176,15 @@ def _render_candidate_view(scores: dict) -> None:
 
     st.divider()
 
-    # LLM-generated feedback. Strip any leading / trailing markdown code
-    # fences in case the saved string still has them (older LLM runs
-    # wrapped the answer in ```markdown ... ``` which made st.markdown
-    # render the whole thing as a code block).
+    # LLM-generated feedback
     st.subheader("Your developmental feedback")
-    fb = scores.get("candidate_feedback") or ""
-    if fb:
+    if scores.get("candidate_feedback"):
+        # Defence-in-depth: also strip code fences at display time so any
+        # already-saved rows (from older LLM runs that wrapped output in
+        # ```markdown ... ```) still render as styled markdown rather than
+        # a code block.
         from assessment_logic.feedback_generator import _strip_code_fences
-        st.markdown(_strip_code_fences(fb))
+        st.markdown(_strip_code_fences(scores["candidate_feedback"]))
     else:
         st.info("Personalized feedback is still being generated. Please refresh in a moment.")
 

@@ -264,7 +264,7 @@ def build_verbal_rows(src: Path, prefix: str) -> list:
     Source columns: #, Text, Statement, Answer (A/B/C), Full Answer, ...
     A = True, B = False, C = Cannot Say.
     Options are LOCKED (True/False/Cannot Say must always appear in that
-    order — shuffling the labels would defeat the format).
+    order, shuffling the labels would defeat the format).
     """
     df = pd.read_excel(src)
     rows = []

@@ -54,6 +54,13 @@ def initial_state(scenario: dict) -> dict:
         "events_history": {},
         "tradeoff_choice": None,
         "decision_choices": {},
+        # Tracks the deltas we already applied for each decision_id, so that
+        # if the candidate changes their mind and a different choice is
+        # applied for the same decision, we can refund the previous effect
+        # cleanly before applying the new one. Keyed by decision_id; each
+        # value is {"cash": int, "reputation": int, "consultant_id": str|None,
+        # "departed_at_week": int|None}.
+        "decision_applied_effects": {},
         # consultant_id -> week they leave (exclusive). If absent, they're still around.
         "consultants_departed_at_week": {},
         "weekly_log": [],
@@ -185,28 +192,61 @@ def _project_week_quality(
 # ----- Decisions (Week 2 resignation, etc.) -----
 
 def apply_decision(state: dict, scenario: dict, decision_id: str, choice_id: str) -> None:
-    """Mutates state to record the decision and apply its effects."""
+    """Apply (or re-apply) a decision to state.
+
+    Idempotent and overwriting: if this decision has already been applied
+    once and the candidate changes their mind, we first reverse the prior
+    effects (refund cash, reverse reputation, clear any departure record)
+    before applying the new choice. This means the radio re-selection in
+    the UI cannot leave stale effects behind.
+    """
     decision = scenario.get("decisions", {}).get(decision_id)
     if not decision:
         return
     chosen = next((o for o in decision["options"] if o["id"] == choice_id), None)
     if not chosen:
         return
+
+    state.setdefault("decision_applied_effects", {})
+
+    # 1. Reverse any prior application of this decision.
+    prior = state["decision_applied_effects"].get(decision_id)
+    if prior:
+        state["cash"] -= prior.get("cash", 0)
+        state["reputation"] -= prior.get("reputation", 0)
+        prior_cid = prior.get("consultant_id")
+        if prior_cid is not None:
+            state.get("consultants_departed_at_week", {}).pop(prior_cid, None)
+
+    # 2. Apply the new choice.
     state["decision_choices"][decision_id] = choice_id
 
     effects = chosen.get("effects", {})
-    state["cash"] += effects.get("cash", 0)
-    state["reputation"] += effects.get("reputation", 0)
+    cash_delta = int(effects.get("cash", 0))
+    rep_delta = int(effects.get("reputation", 0))
+    state["cash"] += cash_delta
+    state["reputation"] += rep_delta
 
     consultant_change = effects.get("consultant_change")
     cid = decision.get("consultant_id")
+    departed_at_week: int | None = None
     if cid:
         if consultant_change == "leave_immediately":
-            state["consultants_departed_at_week"][cid] = state["current_week"]
+            departed_at_week = state["current_week"]
+            state["consultants_departed_at_week"][cid] = departed_at_week
         elif consultant_change == "leave_week_3":
             # leaves at the end of next week, i.e. unavailable from current_week+2
-            state["consultants_departed_at_week"][cid] = state["current_week"] + 2
+            departed_at_week = state["current_week"] + 2
+            state["consultants_departed_at_week"][cid] = departed_at_week
         # "keep" means no departure recorded
+
+    # 3. Record what we just did so a future overwrite can reverse it.
+    state["decision_applied_effects"][decision_id] = {
+        "cash": cash_delta,
+        "reputation": rep_delta,
+        "consultant_id": cid,
+        "departed_at_week": departed_at_week,
+    }
 
 
 # ----- Week tick -----
@@ -253,7 +293,7 @@ def advance_week(
         week_log["cash_change"] += new_state["cash"] - cash_before
         week_log["reputation_change"] += new_state["reputation"] - rep_before
 
-    # 1. Trade-off (Week 6) — applies before regular week processing
+    # 1. Trade-off (Week 6), applies before regular week processing
     if week == scenario.get("tradeoff", {}).get("trigger_week") and tradeoff_choice:
         tradeoff = scenario["tradeoff"]
         chosen = next((o for o in tradeoff["options"] if o["id"] == tradeoff_choice), None)

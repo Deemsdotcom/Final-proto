@@ -13,6 +13,43 @@ import streamlit as st
 from database import db
 
 
+# Filter widget keys (explicit so the Reset button can clear them).
+FILTER_KEYS = [
+    "recruiter_min_overall",
+    "recruiter_min_l1",
+    "recruiter_min_l2",
+    "recruiter_min_l3",
+    "recruiter_name_search",
+    "recruiter_top_fit_only",
+    "recruiter_date_range",
+]
+
+
+def _format_ai_flags(row: dict) -> str:
+    """Build the 'Possible AI use' cell string from the four flag columns.
+
+    Empty if no flags. Otherwise lists which Layer 1 themes tripped, plus
+    whether Layer 2 tripped. Examples:
+      ""
+      "L1 verbal"
+      "L1 logical+numerical, L2"
+      "L2"
+    """
+    l1_themes = []
+    if int(row.get("ai_flag_logical") or 0):
+        l1_themes.append("logical")
+    if int(row.get("ai_flag_numerical") or 0):
+        l1_themes.append("numerical")
+    if int(row.get("ai_flag_verbal") or 0):
+        l1_themes.append("verbal")
+    parts = []
+    if l1_themes:
+        parts.append("L1 " + "+".join(l1_themes))
+    if int(row.get("ai_flag_layer2") or 0):
+        parts.append("L2")
+    return ", ".join(parts) if parts else "-"
+
+
 def render() -> None:
     st.title("Recruiter Dashboard")
     st.caption("Review completed candidate assessments, filter by score, and export.")
@@ -29,14 +66,18 @@ def render() -> None:
     # --- Sidebar filters ---
     with st.sidebar:
         st.header("Filters")
-        min_overall = st.slider("Min overall score", 0, 100, 0)
-        min_l1 = st.slider("Min Layer 1 score", 0, 100, 0)
-        min_l2 = st.slider("Min Layer 2 score", 0, 100, 0)
-        min_l3 = st.slider("Min Layer 3 score", 0, 100, 0)
-
-        st.markdown("**Competency thresholds**")
-        min_comp_strategic = st.slider("Min strategic", 0, 100, 0)
-        min_comp_growth = st.slider("Min L3 Growth Driven Mindset", 0, 100, 0)
+        min_overall = st.slider(
+            "Min overall score", 0, 100, 0, key="recruiter_min_overall",
+        )
+        min_l1 = st.slider(
+            "Min Layer 1 score", 0, 100, 0, key="recruiter_min_l1",
+        )
+        min_l2 = st.slider(
+            "Min Layer 2 score", 0, 100, 0, key="recruiter_min_l2",
+        )
+        min_l3 = st.slider(
+            "Min Layer 3 score", 0, 100, 0, key="recruiter_min_l3",
+        )
 
         if not df.empty:
             date_min = df["completed_at_dt"].min().date()
@@ -45,14 +86,22 @@ def render() -> None:
                 "Completed between",
                 value=(date_min, date_max),
                 min_value=date_min, max_value=date_max,
+                key="recruiter_date_range",
             )
         else:
             date_range = None
 
-        name_search = st.text_input("Name contains", "")
-        top_fit_only = st.checkbox("Top Fit only")
+        name_search = st.text_input(
+            "Name contains", "", key="recruiter_name_search",
+        )
+        top_fit_only = st.checkbox(
+            "Top Fit only", key="recruiter_top_fit_only",
+        )
 
         if st.button("Reset filters"):
+            for k in FILTER_KEYS:
+                if k in st.session_state:
+                    del st.session_state[k]
             st.rerun()
 
     # --- Apply filters ---
@@ -61,8 +110,6 @@ def render() -> None:
     filtered = filtered[filtered["layer1_score"] >= min_l1]
     filtered = filtered[filtered["layer2_score"] >= min_l2]
     filtered = filtered[filtered["layer3_score"] >= min_l3]
-    filtered = filtered[filtered["competency_strategic"].fillna(0) >= min_comp_strategic]
-    filtered = filtered[filtered[["competency_l3_growth_driven_mindset", "competency_l3_proactivity", "competency_l3_learning_mindset"]].fillna(0).max(axis=1) >= min_comp_growth]
     if name_search:
         filtered = filtered[filtered["full_name"].str.contains(name_search, case=False, na=False)]
     if top_fit_only:
@@ -97,18 +144,29 @@ def render() -> None:
 
     # --- Overview table ---
     st.subheader("Candidates")
-    display_df = filtered[[
-        "full_name", "email", "completed_at", "layer1_score",
-        "layer2_score", "layer3_score", "overall_score", "top_fit",
-    ]].copy()
-    display_df.columns = [
+    table_rows = []
+    for _, row in filtered.iterrows():
+        typed_fallback_count = db.count_layer3_typed_fallback(row["candidate_id"])
+        if typed_fallback_count > 0:
+            typed_fallback_cell = f"🛠 {typed_fallback_count}/4"
+        else:
+            typed_fallback_cell = "-"
+        table_rows.append({
+            "Name": row["full_name"],
+            "Email": row["email"],
+            "Completed": pd.to_datetime(row["completed_at"]).strftime("%Y-%m-%d %H:%M"),
+            "Layer 1": round(float(row["layer1_score"] or 0), 1),
+            "Layer 2": round(float(row["layer2_score"] or 0), 1),
+            "Layer 3": round(float(row["layer3_score"] or 0), 1),
+            "Overall": round(float(row["overall_score"] or 0), 1),
+            "Possible AI use": _format_ai_flags(row.to_dict()),
+            "L3 typed fallback": typed_fallback_cell,
+            "Top Fit": "✓" if row["top_fit"] == 1 else "-",
+        })
+    display_df = pd.DataFrame(table_rows, columns=[
         "Name", "Email", "Completed", "Layer 1", "Layer 2", "Layer 3",
-        "Overall", "Top Fit",
-    ]
-    display_df["Top Fit"] = display_df["Top Fit"].map({1: "✓", 0: "-"})
-    display_df["Completed"] = pd.to_datetime(display_df["Completed"]).dt.strftime("%Y-%m-%d %H:%M")
-    for col in ["Layer 1", "Layer 2", "Layer 3", "Overall"]:
-        display_df[col] = display_df[col].round(1)
+        "Overall", "Possible AI use", "L3 typed fallback", "Top Fit",
+    ])
 
     st.dataframe(
         display_df,
@@ -136,7 +194,7 @@ def render() -> None:
         return
 
     options = {
-        f"{row['full_name']} ({row['email']}) - Overall {row['overall_score']:.0f}": row["candidate_id"]
+        f"{row['full_name']} ({row['email']}): Overall {row['overall_score']:.0f}": row["candidate_id"]
         for _, row in filtered.iterrows()
     }
     chosen_label = st.selectbox("Select a candidate", options=list(options.keys()))
@@ -158,11 +216,11 @@ def _render_deep_dive(candidate_id: str) -> None:
         f"Completed {candidate['completed_at'][:10] if candidate['completed_at'] else '-'}"
     )
 
-    # Top Fit badge
+    # Top Fit badge (v7: single rule, overall >= 70)
     if scores["top_fit"]:
-        st.success("✓ **Top Fit** - Meets all bar criteria (overall ≥70, no layer <60, ≥2 competencies ≥75)")
+        st.success("✓ **Top Fit**: Overall score ≥ 70")
     else:
-        st.warning("- Not flagged as Top Fit")
+        st.warning("Not flagged as Top Fit")
 
     # Score summary
     cols = st.columns(4)
@@ -171,19 +229,16 @@ def _render_deep_dive(candidate_id: str) -> None:
     cols[2].metric("Layer 2", f"{scores['layer2_score']:.1f}")
     cols[3].metric("Layer 3", f"{scores['layer3_score']:.1f}")
 
-    # Competency radar. Layer 3 columns are the v5 set (4 keys); legacy
-    # rows (proactivity / learning_mindset) fall back into the merged
-    # Growth Driven Mindset petal so historical candidates still render.
-    legacy_growth = (
-        scores.get("competency_l3_proactivity")
-        or scores.get("competency_l3_learning_mindset")
-        or 0
-    )
-    growth = scores.get("competency_l3_growth_driven_mindset") or legacy_growth or 0
+    # Possible AI use chip
+    flags_str = _format_ai_flags(scores)
+    if flags_str and flags_str != "-":
+        st.warning(f"⚠️ Possible AI use flagged: **{flags_str}**  (informational only)")
+
+    # Competency radar (v7: 4 L3 axes)
     comp_labels = [
         "Analytical", "Numerical", "Verbal",
         "Strategic", "Adaptability (sim)",
-        "Growth Driven Mindset", "Adaptability (interview)",
+        "Growth Mindset", "Adaptability (interview)",
         "Collaboration", "Self-Reflection",
     ]
     comp_values = [
@@ -192,7 +247,7 @@ def _render_deep_dive(candidate_id: str) -> None:
         scores.get("competency_verbal") or 0,
         scores.get("competency_strategic") or 0,
         scores.get("competency_adaptability") or 0,
-        growth,
+        scores.get("competency_l3_growth_mindset") or 0,
         scores.get("competency_l3_adaptability") or 0,
         scores.get("competency_l3_collaboration") or 0,
         scores.get("competency_l3_self_reflection") or 0,
@@ -218,7 +273,7 @@ def _render_deep_dive(candidate_id: str) -> None:
         st.info("No recruiter summary generated yet.")
 
     # Layer 1 detail
-    with st.expander("Layer 1 · Question-by-question detail"):
+    with st.expander("Layer 1: Question-by-question detail"):
         l1_rows = db.get_layer1_results(candidate_id)
         if l1_rows:
             df1 = pd.DataFrame([{
@@ -235,7 +290,7 @@ def _render_deep_dive(candidate_id: str) -> None:
             st.write("No Layer 1 data.")
 
     # Layer 2 detail
-    with st.expander("Layer 2 · Firm simulation detail"):
+    with st.expander("Layer 2: Firm simulation detail"):
         l2_sim = db.get_layer2_simulation(candidate_id)
         if not l2_sim:
             st.write("No Layer 2 data.")
@@ -257,7 +312,6 @@ def _render_deep_dive(candidate_id: str) -> None:
             else:
                 st.markdown("*No trade-off decision recorded (didn't reach Week 6 or didn't choose).*")
 
-            # Surface the Week 2 decision from the final state json
             try:
                 final_state = json.loads(l2_sim["final_state_json"])
                 decisions = final_state.get("decision_choices", {})
@@ -286,14 +340,14 @@ def _render_deep_dive(candidate_id: str) -> None:
                 if log.get("decision"):
                     decision_info = log["decision"]
                     st.markdown(
-                        f"- 📋 Decision: **{decision_info.get('decision_id')}** → "
+                        f"- 📋 Decision: **{decision_info.get('decision_id')}** -> "
                         f"option **{decision_info.get('choice_id')}**"
                     )
                 if log.get("actions"):
                     for a in log["actions"]:
                         issues = f" ⚠️ {' / '.join(a['issues'])}" if a.get("issues") else ""
                         st.markdown(
-                            f"- **{a['project_id']}** ← {', '.join(a['consultant_ids']) or '-'} "
+                            f"- **{a['project_id']}** <- {', '.join(a['consultant_ids']) or '-'} "
                             f"(burn €{a['burn']:,}, quality {a['quality_mult_this_week']:.2f}){issues}"
                         )
                 if log.get("completions"):
@@ -306,7 +360,7 @@ def _render_deep_dive(candidate_id: str) -> None:
                     st.markdown(f"- ⏰ Missed deadline: {', '.join(log['missed_deadlines'])}")
 
     # Layer 3 detail
-    with st.expander("Layer 3 · Interview transcripts"):
+    with st.expander("Layer 3: Interview transcripts"):
         l3_rows = db.get_layer3_results(candidate_id)
         if not l3_rows:
             st.write("No Layer 3 data.")
@@ -314,13 +368,48 @@ def _render_deep_dive(candidate_id: str) -> None:
             "A": "GET SPECIFIC", "B": "GET EVIDENCE",
             "C": "GET REASONING", "D": "GET REFLECTION",
         }
+        # Threshold (seconds) above which a pre-record pause is flagged
+        # as a possible AI signal. Kept conservative; 15s is "I'm thinking
+        # hard" territory, longer than that and the candidate may be
+        # typing into another tool.
+        PAUSE_FLAG_THRESHOLD_SECONDS = 15.0
+
+        def _format_pause(seconds: float | None) -> str:
+            """Render the time-to-record cell, flagging suspicious pauses."""
+            if seconds is None:
+                return "-"
+            if seconds >= PAUSE_FLAG_THRESHOLD_SECONDS:
+                return f"🚩 {seconds:.1f}s (long pause — possible AI)"
+            return f"{seconds:.1f}s"
+
+        # Top-level typed-fallback callout: if the candidate hit the
+        # "technical issues with recording" button on one or more
+        # competencies, surface it once at the top of the L3 section
+        # so the recruiter doesn't have to scan every competency row
+        # to spot it. Per-competency detail still shows in the headers
+        # below.
+        typed_rows = [r for r in l3_rows if int(r.get("typed_fallback_used") or 0)]
+        if typed_rows:
+            comp_labels = ", ".join(
+                f"Q{r['competency_order']} ({r['competency_name']})"
+                for r in typed_rows
+            )
+            st.warning(
+                f"🛠 **Typed-answer fallback used on {len(typed_rows)} of "
+                f"{len(l3_rows)} questions** — the candidate reported "
+                f"technical issues with recording and typed their answer "
+                f"on: {comp_labels}."
+            )
+
         for r in l3_rows:
             header = (
-                f"**Competency {r['competency_order']} - "
+                f"**Competency {r['competency_order']}: "
                 f"{r['competency_id']}: {r['competency_name']}**"
             )
             if r.get("scripted_flag"):
                 header += "  🚩 *flagged: possibly scripted*"
+            if int(r.get("typed_fallback_used") or 0):
+                header += "  🛠 *typed-answer fallback used*"
             st.markdown(header)
 
             score = r.get("competency_score")
@@ -331,12 +420,20 @@ def _render_deep_dive(candidate_id: str) -> None:
 
             st.markdown(f"*Main question:* {r['main_question']}")
             st.markdown(f"*Main answer:* > {r['main_transcript'] or '(no answer)'}")
+            st.markdown(
+                f"*Pause before recording (main):* "
+                f"{_format_pause(r.get('main_time_to_record_seconds'))}"
+            )
 
             if r.get("followup_question"):
                 bucket = r.get("followup_bucket")
                 bucket_label = f" [{bucket_names.get(bucket, bucket)}]" if bucket else ""
                 st.markdown(f"*Follow-up{bucket_label}:* {r['followup_question']}")
                 st.markdown(f"*Follow-up answer:* > {r.get('followup_transcript') or '(no answer)'}")
+                st.markdown(
+                    f"*Pause before recording (follow-up):* "
+                    f"{_format_pause(r.get('followup_time_to_record_seconds'))}"
+                )
 
             st.markdown("---")
 

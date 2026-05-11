@@ -41,9 +41,9 @@ CREATE TABLE IF NOT EXISTS layer2_simulation (
 CREATE TABLE IF NOT EXISTS layer3_results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     candidate_id TEXT NOT NULL,
-    competency_order INTEGER NOT NULL,        -- 1..5, the order asked
-    competency_id TEXT NOT NULL,              -- 'A10', 'A1', 'A12', 'A6', 'A15'
-    competency_key TEXT NOT NULL,             -- 'proactivity', 'learning_mindset', etc.
+    competency_order INTEGER NOT NULL,        -- 1..4, the order asked
+    competency_id TEXT NOT NULL,              -- 'A1A10', 'A12', 'A6', 'A15'
+    competency_key TEXT NOT NULL,             -- 'growth_mindset', 'adaptability', 'collaboration', 'self_reflection'
     competency_name TEXT NOT NULL,            -- human-readable label
     main_question TEXT NOT NULL,
     main_transcript TEXT,
@@ -52,9 +52,12 @@ CREATE TABLE IF NOT EXISTS layer3_results (
     followup_question TEXT,
     followup_transcript TEXT,
     followup_audio_duration_seconds REAL,
-    competency_score INTEGER,                 -- 0-20
+    competency_score INTEGER,                 -- 0-25
     scripted_flag INTEGER NOT NULL DEFAULT 0, -- 0/1
     rationale TEXT,
+    main_time_to_record_seconds REAL,         -- seconds between question end and record click
+    followup_time_to_record_seconds REAL,
+    typed_fallback_used INTEGER NOT NULL DEFAULT 0, -- 0/1: did candidate use the "technical issues" typed-answer escape on this competency (either main or follow-up)?
     FOREIGN KEY (candidate_id) REFERENCES candidates(candidate_id)
 );
 
@@ -69,12 +72,14 @@ CREATE TABLE IF NOT EXISTS final_scores (
     competency_verbal REAL,
     competency_strategic REAL,
     competency_adaptability REAL,
-    competency_l3_proactivity REAL,             -- legacy (pre-v5)
-    competency_l3_learning_mindset REAL,        -- legacy (pre-v5)
-    competency_l3_growth_driven_mindset REAL,   -- v5: merged A1+A10
+    competency_l3_growth_mindset REAL,
     competency_l3_adaptability REAL,
     competency_l3_collaboration REAL,
     competency_l3_self_reflection REAL,
+    ai_flag_logical INTEGER NOT NULL DEFAULT 0,
+    ai_flag_numerical INTEGER NOT NULL DEFAULT 0,
+    ai_flag_verbal INTEGER NOT NULL DEFAULT 0,
+    ai_flag_layer2 INTEGER NOT NULL DEFAULT 0,
     top_fit INTEGER NOT NULL,
     recruiter_summary TEXT,
     candidate_feedback TEXT,

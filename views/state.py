@@ -39,7 +39,7 @@ def init_session_state() -> None:
         "l2_started_at": None,
         "l2_state": None,                # the firm simulation state dict
 
-        # Layer 3 progress
+        # Layer 3 progress (per-question two-step flow with main + followup)
         "l3_started": False,
         "l3_main_questions": [],
         "l3_question_idx": 0,
@@ -48,7 +48,8 @@ def init_session_state() -> None:
         "l3_answer_scores": [],
         "l3_question_started_at": None,
         "l3_last_transcript": None,
-        # Layer 3 voice-call state (new in the call rebuild)
+
+        # Layer 3 voice-call state (hands-free single-page call)
         "l3_call_phase": "intro",        # intro / active / closing / scoring / done
         "l3_turn_idx": 0,
         "l3_main_transcripts": {},
@@ -82,6 +83,19 @@ def reset_candidate_state() -> None:
         "l3_closer_spoken", "l3_closing_started_at",
         "final_result_computed",
     ]
+    # Also strip any per-turn / per-theme dynamic keys.
+    dynamic_prefixes = [
+        "l3_transcript_", "l3_audio_", "l3_transcript_shown_",
+        "l3_transcribed_id_", "l3_main_transcript_",
+        "l3_spoken_", "l3_speak_started_", "l3_deadline_", "l3_spoken_turn_",
+        "l3_autoadvanced_", "l3_recording_", "l3_ttsdone_",
+        "l3_typed_mode_", "l3_typed_fallback_comp_",
+        "l1_theme_started_at_", "l1_ai_flag_",
+        "l2_ai_flag",
+    ]
+    for k in list(st.session_state.keys()):
+        if any(k.startswith(p) or k == p for p in dynamic_prefixes):
+            del st.session_state[k]
     for k in keys:
         if k in st.session_state:
             del st.session_state[k]
@@ -119,7 +133,7 @@ def resume_from_db(candidate: dict) -> None:
         st.session_state.l1_question_idx = 0
 
     # Layer 2: simulation is not checkpointed mid-layer. If a final result
-    # exists in the DB, the candidate already finished Layer 2 · keep them
+    # exists in the DB, the candidate already finished Layer 2, keep them
     # past the L2 stage. If not, they'll restart the sim from Week 1.
     if db.has_layer2_simulation(cid):
         st.session_state.l2_started = True
@@ -130,7 +144,12 @@ def resume_from_db(candidate: dict) -> None:
         st.session_state.l2_started = False
         st.session_state.l2_state = None
 
-    # Layer 3: rehydrate completed competencies
+    # Layer 3: rehydrate completed competencies. With the v6-style per-question
+    # flow, each completed competency has been scored and saved to DB. If the
+    # candidate refreshes mid-Layer-3, they resume from the main question of
+    # the next un-scored competency. Mid-competency state (e.g. main answered
+    # but follow-up not yet) isn't persisted; that competency restarts from
+    # its main question.
     l3_rows = db.get_layer3_results(cid)
     st.session_state.l3_answer_scores = [
         {

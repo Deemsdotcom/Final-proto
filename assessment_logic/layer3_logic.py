@@ -1,9 +1,8 @@
 """Layer 3 logic: AI-led structured behavioral interview.
 
-Scores 4 competencies (A1+A10 merged into Growth Driven Mindset, A12, A6,
-A15) on a 0-25 scale, summing to a Layer 3 total of 0-100. One question
-per competency (randomly chosen from a bank of 5), one targeted follow-up
-per question.
+Scores 5 competencies (A10, A1, A12, A6, A15) on a 0-20 scale, summing
+to a Layer 3 total of 0-100. One question per competency (randomly
+chosen from a bank of 5), one targeted follow-up per question.
 
 Question selection is seeded by candidate_id for reproducibility.
 LLM-driven follow-up generation and rubric scoring use temperature=0.
@@ -21,7 +20,7 @@ from typing import List, Tuple
 from .llm_client import chat_complete
 
 QUESTIONS_PATH = Path(__file__).parent.parent / "data" / "interview_questions.json"
-PER_QUESTION_SECONDS = 120  # 2 min per answer; 4 competencies x (main+followup) ~= 16 min
+PER_QUESTION_SECONDS = 120  # 2 min per answer; 5 competencies x (main+followup) ~= 20 min
 
 
 def _load_competencies() -> list[dict]:
@@ -58,12 +57,12 @@ Your goal for the follow-up: {followup_goal}
 
 Pick exactly ONE of these four follow-up types based on what the candidate actually said:
 
-A) GET SPECIFIC — if the answer was vague or general (no concrete moment, no specific action they personally took)
-B) GET EVIDENCE — if the answer sounded prepared or abstract (no real outcome, sounds rehearsed)
-C) GET REASONING — if the answer was good but didn't explain the thinking behind their choice
-D) GET REFLECTION — if the answer described an outcome but not what they learned
+A) GET SPECIFIC, if the answer was vague or general (no concrete moment, no specific action they personally took)
+B) GET EVIDENCE, if the answer sounded prepared or abstract (no real outcome, sounds rehearsed)
+C) GET REASONING, if the answer was good but didn't explain the thinking behind their choice
+D) GET REFLECTION, if the answer described an outcome but not what they learned
 
-The follow-up must respond directly to what they said — not a generic probe. It must be answerable in under 2 minutes.
+The follow-up must respond directly to what they said, not a generic probe. It must be answerable in under 2 minutes.
 
 Return ONLY a JSON object in this exact format, no preamble or markdown:
 {{"bucket": "<A|B|C|D>", "question": "<the follow-up question>"}}"""
@@ -81,13 +80,13 @@ What the follow-up was trying to surface: {followup_goal}
 
 Use these anchor points as reference. Whole numbers between anchors are encouraged when the candidate falls between levels.
 
-0  - No evidence: Generic, off-topic, or no example provided.
-6  - Weak: A situation was mentioned but vague, no clear personal contribution or outcome.
-13 - Adequate: Clear example with some personal ownership, basic reflection. Meets the bar.
-19 - Strong: Specific example, clear personal contribution, meaningful outcome, genuine reflection.
-25 - Exceptional: Outstanding specificity, deep self-awareness, behavioral change demonstrated, highly credible and nuanced.
+0  : No evidence. Generic, off-topic, or no example provided.
+6  : Weak. A situation was mentioned but vague, with no clear personal contribution.
+13 : Adequate. Clear example, some personal ownership, basic reflection. Meets the bar.
+19 : Strong. Specific example, clear personal contribution, meaningful outcome, genuine reflection.
+25 : Exceptional. Outstanding specificity, deep self-awareness, behavioral change demonstrated.
 
-Also flag whether the answer appears scripted (perfect STAR structure with no emotional texture, identical phrasing patterns, sounds rehearsed). Scripted does NOT mean low-scoring on its own - flag for human review only.
+Also flag whether the answer appears scripted (perfect STAR structure with no emotional texture, identical phrasing patterns, sounds rehearsed). Scripted does NOT mean low-scoring on its own; flag for human review only.
 
 Return ONLY a JSON object in this exact format, no preamble or markdown:
 {{"score": <integer 0-25>, "scripted_flag": <true|false>, "rationale": "<one short sentence>"}}"""
@@ -95,7 +94,7 @@ Return ONLY a JSON object in this exact format, no preamble or markdown:
 
 GENERIC_FALLBACK_FOLLOWUP = {
     "bucket": "A",
-    "question": "Can you walk me through exactly what you personally did — not the team, just you?",
+    "question": "Can you walk me through exactly what you personally did, not the team, just you?",
 }
 
 
@@ -261,22 +260,15 @@ def aggregate_layer3(
     competency_scores: list of dicts each with at least
       {"competency_key": str, "score": int 0-25}.
 
-    Each per-competency score (0-25) is also scaled to 0-100 in the
-    competency dict so it's directly comparable with Layer 1/2 competencies
-    in the recruiter dashboard radar. Scale factor is 4 (25 * 4 = 100).
-
-    The active key set is 4 competencies (growth_driven_mindset,
-    adaptability, collaboration, self_reflection). The legacy keys
-    (proactivity, learning_mindset) are kept in the output dict at 0.0
-    so historical schema/columns still receive a numeric value.
+    Total = sum of the four 0-25 scores, naturally on 0-100 (no scaling).
+    Each per-competency score (0-25) is scaled to 0-100 in the competency
+    dict (* 4) so it's directly comparable with Layer 1/2 competencies in
+    the recruiter dashboard radar.
     """
-    keys = ("growth_driven_mindset", "adaptability",
-            "collaboration", "self_reflection")
-    legacy_keys = ("proactivity", "learning_mindset")
+    keys = ("growth_mindset", "adaptability", "collaboration", "self_reflection")
 
-    empty = {f"competency_l3_{k}": 0.0 for k in keys + legacy_keys}
     if not competency_scores:
-        return 0.0, empty
+        return 0.0, {f"competency_l3_{k}": 0.0 for k in keys}
 
     total = sum(int(s.get("score", 0)) for s in competency_scores)
     total = max(0, min(100, total))
@@ -288,16 +280,16 @@ def aggregate_layer3(
             continue
         comp_dict[f"competency_l3_{key}"] = round(int(s.get("score", 0)) * 4, 2)
 
-    for key in keys + legacy_keys:
+    for key in keys:
         comp_dict.setdefault(f"competency_l3_{key}", 0.0)
 
     return float(total), comp_dict
 
 
-# ---- Recruiter persona patter (used by the in-call view) ----
+# ---- Recruiter persona patter (used by the voice-call view) ----
 #
-# These lines are spoken by the AI between the fixed rubric questions. The
-# wording follows the persona rules in the v5 prompt doc: warm but
+# These lines are spoken by the AI between the fixed rubric questions.
+# The wording follows the persona rules in the v5 prompt doc: warm but
 # professional, concise, no explanation of why a question is being asked,
 # and the exact closing line from the doc.
 
@@ -309,7 +301,7 @@ RECRUITER_OPENER = (
     "Here is the first one."
 )
 
-# Verbatim closer from the v5 prompt doc (em-dash replaced with a hyphen
+# Verbatim closer from the v5 prompt doc (em-dash replaced with hyphen
 # to match the codebase house style).
 RECRUITER_CLOSER = (
     "Thank you - that is everything we need for now. "

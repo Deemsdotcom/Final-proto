@@ -16,23 +16,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator, Optional
 
-import bcrypt
-
 DB_PATH = Path(__file__).parent.parent / "recruitment.db"
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 
-def get_recruiter_password() -> str:
+def _get_recruiter_password() -> str:
     """Read recruiter password from Streamlit secrets, then env, then fallback.
 
     Streamlit secrets are checked first so production deployments use the
     configured password. Falls back to the env var, then a local-dev default
     so the app still runs without any config (with a weak password).
-
-    Always call this at the point of use, not at module import time. On
-    Streamlit Cloud, st.secrets is not always populated when this module
-    is first imported; caching the result at import would silently fall
-    back to the local-dev default.
     """
     try:
         import streamlit as st
@@ -43,49 +36,13 @@ def get_recruiter_password() -> str:
     return os.getenv("RECRUITER_PASSWORD", "changeme-local-dev")
 
 
-# Backwards-compatible private alias. Prefer the public name above.
-_get_recruiter_password = get_recruiter_password
-
-
 DEFAULT_RECRUITER_USERNAME = "recruiter"
+DEFAULT_RECRUITER_PASSWORD = _get_recruiter_password()
 
 
 def _hash_password(password: str) -> str:
-    """Hash a password using bcrypt with a per-call salt.
-
-    Returns the standard `$2b$...` modular crypt format. Non-deterministic:
-    two calls with the same input produce different hashes (which is the
-    point — bcrypt embeds the salt in the output).
-    """
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("ascii")
-
-
-def _legacy_sha256(password: str) -> str:
-    """Legacy SHA-256 hex digest used by the previous version of this app.
-
-    Kept only so we can recognize and seamlessly upgrade pre-existing
-    recruiter rows that were seeded under the old scheme.
-    """
+    """SHA-256 hash. Fine for a pilot; swap for bcrypt in production."""
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
-
-
-def _verify_password(password: str, stored_hash: str) -> bool:
-    """Check a candidate password against a stored hash.
-
-    Recognizes both the new bcrypt format (`$2...`) and the legacy SHA-256
-    hex format. Callers that need to migrate the stored hash should call
-    `_hash_password` after a successful legacy match and persist the new
-    value.
-    """
-    if not stored_hash:
-        return False
-    if stored_hash.startswith("$2"):
-        try:
-            return bcrypt.checkpw(password.encode("utf-8"), stored_hash.encode("ascii"))
-        except (ValueError, TypeError):
-            return False
-    # Legacy SHA-256 hex digest path.
-    return stored_hash == _legacy_sha256(password)
 
 
 @contextmanager
@@ -113,6 +70,50 @@ def get_conn() -> Iterator[sqlite3.Connection]:
         raise last_err
 
 
+def _existing_columns(conn: sqlite3.Connection, table: str) -> set[str]:
+    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    return {row["name"] for row in rows}
+
+
+def _migrate_final_scores(conn: sqlite3.Connection) -> None:
+    """Add new columns to final_scores if missing.
+
+    Idempotent: safe to run on a fresh DB or one already migrated. We don't
+    DROP the old proactivity / learning_mindset columns because SQLite's
+    ALTER TABLE DROP COLUMN is only available on 3.35+; instead we just
+    stop writing to them. They'll sit at NULL for new rows.
+    """
+    cols = _existing_columns(conn, "final_scores")
+    additions = [
+        ("competency_l3_growth_mindset", "REAL"),
+        ("ai_flag_logical",   "INTEGER NOT NULL DEFAULT 0"),
+        ("ai_flag_numerical", "INTEGER NOT NULL DEFAULT 0"),
+        ("ai_flag_verbal",    "INTEGER NOT NULL DEFAULT 0"),
+        ("ai_flag_layer2",    "INTEGER NOT NULL DEFAULT 0"),
+    ]
+    for name, decl in additions:
+        if name not in cols:
+            conn.execute(f"ALTER TABLE final_scores ADD COLUMN {name} {decl}")
+
+
+def _migrate_layer3_results(conn: sqlite3.Connection) -> None:
+    """Add new columns to layer3_results if missing.
+
+    v8.1 adds time-to-record tracking: how many seconds elapsed between
+    the AI finishing the question and the candidate clicking record. Long
+    pauses are flagged in the recruiter dashboard as a possible AI signal.
+    """
+    cols = _existing_columns(conn, "layer3_results")
+    additions = [
+        ("main_time_to_record_seconds", "REAL"),
+        ("followup_time_to_record_seconds", "REAL"),
+        ("typed_fallback_used", "INTEGER NOT NULL DEFAULT 0"),
+    ]
+    for name, decl in additions:
+        if name not in cols:
+            conn.execute(f"ALTER TABLE layer3_results ADD COLUMN {name} {decl}")
+
+
 def init_db() -> bool:
     """Initialize schema and seed/sync default recruiter.
 
@@ -121,53 +122,31 @@ def init_db() -> bool:
     if the recruiter row was freshly created (not just synced).
     """
     freshly_seeded = False
-    configured_password = _get_recruiter_password()
     with get_conn() as conn:
         with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
             conn.executescript(f.read())
 
-        # In-place migration for existing databases: add the
-        # competency_l3_growth_driven_mindset column if it doesn't exist
-        # yet. SQLite's ALTER TABLE ADD COLUMN has no IF NOT EXISTS, so
-        # we catch the OperationalError ("duplicate column") on subsequent
-        # boots. Safe to run on every init.
-        try:
-            conn.execute(
-                "ALTER TABLE final_scores "
-                "ADD COLUMN competency_l3_growth_driven_mindset REAL"
-            )
-        except Exception:
-            pass
+        # Migrate older DBs to add v7 columns if they don't exist yet.
+        _migrate_final_scores(conn)
+        _migrate_layer3_results(conn)
 
-        # Race-safe seed: INSERT OR IGNORE silently no-ops if another
-        # concurrent init_db() (different Streamlit session, same SQLite
-        # file) already inserted the row. cur.rowcount is 1 on success,
-        # 0 if the row already existed.
+        current_hash = _hash_password(DEFAULT_RECRUITER_PASSWORD)
         cur = conn.execute(
-            "INSERT OR IGNORE INTO recruiter_auth (username, password_hash) VALUES (?, ?)",
-            (DEFAULT_RECRUITER_USERNAME, _hash_password(configured_password)),
+            "SELECT password_hash FROM recruiter_auth WHERE username = ?",
+            (DEFAULT_RECRUITER_USERNAME,),
         )
-        freshly_seeded = cur.rowcount > 0
-
-        if not freshly_seeded:
-            # Row already existed — check for secret rotation.
-            row = conn.execute(
-                "SELECT password_hash FROM recruiter_auth WHERE username = ?",
-                (DEFAULT_RECRUITER_USERNAME,),
-            ).fetchone()
-            if row:
-                # bcrypt hashes are non-deterministic, so we can't compare
-                # hashes directly to detect a secret rotation. Instead we
-                # verify the currently-configured password against the
-                # stored hash; mismatch → re-hash, legacy SHA-256 → upgrade.
-                stored = row["password_hash"]
-                currently_valid = _verify_password(configured_password, stored)
-                is_legacy = bool(stored) and not stored.startswith("$2")
-                if not currently_valid or is_legacy:
-                    conn.execute(
-                        "UPDATE recruiter_auth SET password_hash = ? WHERE username = ?",
-                        (_hash_password(configured_password), DEFAULT_RECRUITER_USERNAME),
-                    )
+        row = cur.fetchone()
+        if row is None:
+            conn.execute(
+                "INSERT INTO recruiter_auth (username, password_hash) VALUES (?, ?)",
+                (DEFAULT_RECRUITER_USERNAME, current_hash),
+            )
+            freshly_seeded = True
+        elif row["password_hash"] != current_hash:
+            conn.execute(
+                "UPDATE recruiter_auth SET password_hash = ? WHERE username = ?",
+                (current_hash, DEFAULT_RECRUITER_USERNAME),
+            )
     return freshly_seeded
 
 
@@ -331,6 +310,9 @@ def save_layer3_result(
     competency_score: int,
     scripted_flag: bool,
     rationale: str,
+    main_time_to_record_seconds: float | None = None,
+    followup_time_to_record_seconds: float | None = None,
+    typed_fallback_used: bool = False,
 ) -> None:
     with get_conn() as conn:
         conn.execute(
@@ -339,14 +321,18 @@ def save_layer3_result(
                 competency_name, main_question, main_transcript,
                 main_audio_duration_seconds, followup_bucket, followup_question,
                 followup_transcript, followup_audio_duration_seconds,
-                competency_score, scripted_flag, rationale)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                competency_score, scripted_flag, rationale,
+                main_time_to_record_seconds, followup_time_to_record_seconds,
+                typed_fallback_used)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 candidate_id, competency_order, competency_id, competency_key,
                 competency_name, main_question, main_transcript,
                 main_audio_duration_seconds, followup_bucket, followup_question,
                 followup_transcript, followup_audio_duration_seconds,
                 competency_score, 1 if scripted_flag else 0, rationale,
+                main_time_to_record_seconds, followup_time_to_record_seconds,
+                1 if typed_fallback_used else 0,
             ),
         )
 
@@ -371,19 +357,19 @@ def count_layer3_answered(candidate_id: str) -> int:
         return row["c"]
 
 
-def clear_layer3_results(candidate_id: str) -> None:
-    """Wipe any previously-saved Layer 3 rows for a candidate.
+def count_layer3_typed_fallback(candidate_id: str) -> int:
+    """How many L3 competencies the candidate completed using the typed-fallback escape.
 
-    Called at the start of a fresh interview so re-takes don't leave
-    duplicate competency rows behind (layer3_results has no UNIQUE
-    constraint on (candidate_id, competency_id), so without this a
-    re-take would silently double-write).
+    Used by the recruiter dashboard to show a top-level flag without
+    having to scan each transcript row.
     """
     with get_conn() as conn:
-        conn.execute(
-            "DELETE FROM layer3_results WHERE candidate_id = ?",
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM layer3_results "
+            "WHERE candidate_id = ? AND typed_fallback_used = 1",
             (candidate_id,),
-        )
+        ).fetchone()
+        return row["c"]
 
 
 # ----- Final scores -----
@@ -394,17 +380,17 @@ def save_final_score(data: dict) -> None:
         "candidate_id", "layer1_score", "layer2_score", "layer3_score",
         "overall_score", "competency_analytical", "competency_numerical",
         "competency_verbal", "competency_strategic", "competency_adaptability",
-        "competency_l3_proactivity", "competency_l3_learning_mindset",
-        "competency_l3_growth_driven_mindset",
+        "competency_l3_growth_mindset",
         "competency_l3_adaptability", "competency_l3_collaboration",
         "competency_l3_self_reflection",
+        "ai_flag_logical", "ai_flag_numerical", "ai_flag_verbal", "ai_flag_layer2",
         "top_fit", "recruiter_summary", "candidate_feedback",
     ]
     placeholders = ",".join(["?"] * len(cols))
     with get_conn() as conn:
         conn.execute(
             f"INSERT OR REPLACE INTO final_scores ({','.join(cols)}) VALUES ({placeholders})",
-            tuple(data[c] for c in cols),
+            tuple(data.get(c, 0 if c.startswith("ai_flag_") else None) for c in cols),
         )
 
 
@@ -424,10 +410,10 @@ def get_all_completed_candidates() -> list[dict]:
                       f.layer1_score, f.layer2_score, f.layer3_score, f.overall_score,
                       f.competency_analytical, f.competency_numerical, f.competency_verbal,
                       f.competency_strategic, f.competency_adaptability,
-                      f.competency_l3_proactivity, f.competency_l3_learning_mindset,
-                      f.competency_l3_growth_driven_mindset,
+                      f.competency_l3_growth_mindset,
                       f.competency_l3_adaptability, f.competency_l3_collaboration,
                       f.competency_l3_self_reflection,
+                      f.ai_flag_logical, f.ai_flag_numerical, f.ai_flag_verbal, f.ai_flag_layer2,
                       f.top_fit, f.recruiter_summary, f.candidate_feedback
                FROM candidates c
                JOIN final_scores f ON c.candidate_id = f.candidate_id
@@ -440,12 +426,6 @@ def get_all_completed_candidates() -> list[dict]:
 # ----- Auth -----
 
 def verify_recruiter(username: str, password: str) -> bool:
-    """Check the recruiter username/password.
-
-    Accepts both bcrypt-hashed and legacy SHA-256-hashed rows. If a legacy
-    row matches, it is transparently upgraded to a fresh bcrypt hash so the
-    next login uses the stronger scheme.
-    """
     with get_conn() as conn:
         row = conn.execute(
             "SELECT password_hash FROM recruiter_auth WHERE username = ?",
@@ -453,13 +433,18 @@ def verify_recruiter(username: str, password: str) -> bool:
         ).fetchone()
         if not row:
             return False
-        stored = row["password_hash"]
-        if not _verify_password(password, stored):
-            return False
-        # Successful login — opportunistically upgrade legacy SHA-256 rows.
-        if stored and not stored.startswith("$2"):
-            conn.execute(
-                "UPDATE recruiter_auth SET password_hash = ? WHERE username = ?",
-                (_hash_password(password), username),
-            )
-        return True
+        return row["password_hash"] == _hash_password(password)
+
+
+def clear_layer3_results(candidate_id: str) -> None:
+    """Wipe any previously-saved Layer 3 rows for a candidate.
+
+    Called at the start of a fresh interview so re-takes don't leave
+    duplicate competency rows behind (layer3_results has no UNIQUE
+    constraint on (candidate_id, competency_id)).
+    """
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM layer3_results WHERE candidate_id = ?",
+            (candidate_id,),
+        )

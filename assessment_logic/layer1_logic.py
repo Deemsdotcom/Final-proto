@@ -15,9 +15,9 @@ Question files live in ``data/questions/<pool>.xlsx``. Required columns:
     option_a, option_b, option_c, option_d (option_e is optional),
     correct_answer (letter A-E in unshuffled order)
 Optional columns:
-    image_file        — file in data/charts/, displayed above the question
-    answer_image_file — second image (used by abstract: A-E option grid)
-    lock_options      — "TRUE" disables shuffling; required for image-locked
+    image_file       , file in data/charts/, displayed above the question
+    answer_image_file, second image (used by abstract: A-E option grid)
+    lock_options     , "TRUE" disables shuffling; required for image-locked
                         answer keys like the abstract sets
 """
 
@@ -47,16 +47,30 @@ THEME_POOLS: Dict[str, List[str]] = {
 
 QUESTIONS_PER_THEME = 10
 
-# Per-theme time limits in seconds.
-TIME_LIMITS: Dict[str, int] = {
-    "logical":   75,
-    "numerical": 90,
-    "verbal":    60,
+# Per-theme TOTAL time limits in seconds (one timer per theme block).
+#   Logical:   750s = 12.5 min for 10 questions (~75s avg per question)
+#   Numerical: 900s = 15.0 min for 10 questions (~90s avg per question)
+#   Verbal:    450s =  7.5 min for 10 questions (~45s avg per question)
+THEME_TIME_LIMITS: Dict[str, int] = {
+    "logical":   750,
+    "numerical": 900,
+    "verbal":    450,
 }
 
 
+def theme_time_limit_for(theme: str) -> int:
+    """Total time budget for a theme block, in seconds."""
+    return THEME_TIME_LIMITS.get(theme, 600)
+
+
 def time_limit_for(theme: str) -> int:
-    return TIME_LIMITS.get(theme, 60)
+    """Backward-compat shim: returns the implied per-question average.
+
+    Older code paths still call this expecting per-question seconds. We
+    return the theme total divided by the question count so they don't
+    blow up. New code should call theme_time_limit_for() instead.
+    """
+    return THEME_TIME_LIMITS.get(theme, 600) // QUESTIONS_PER_THEME
 
 
 # Backward-compat: older code paths import TIME_LIMIT_SECONDS as a constant.

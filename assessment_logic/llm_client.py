@@ -1,7 +1,7 @@
 """Centralized Azure OpenAI client with logging, retries, and sensible defaults.
 
 All API calls route through here. The Azure deployment configuration for our
-Capgemini capstone is HARD-CODED below — region, deployment names, API version,
+Capgemini capstone is HARD-CODED below: region, deployment names, API version,
 and endpoint URL are stable values from the project's Azure resource and don't
 need to live in secrets. The only thing that has to be in secrets is the API
 key, because that rotates and grants real access to the Azure resource.
@@ -42,7 +42,7 @@ load_dotenv()
 # ---------------------------------------------------------------------------
 CAPSTONE_CONFIG = {
     "endpoint": "https://swedencentral.api.cognitive.microsoft.com",
-    # Must be 2025-03-01-preview or newer — the gpt-4o-mini-transcribe
+    # Must be 2025-03-01-preview or newer, the gpt-4o-mini-transcribe
     # audio endpoint is not supported on older API versions and Azure will
     # silently route audio requests as chat completions, returning a
     # confusing "unsupported_format" error on the messages param.
