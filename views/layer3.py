@@ -146,6 +146,10 @@ def _render_intro() -> None:
         st.session_state.l3_followup_transcripts = {}
         st.session_state.l3_answer_scores = []
         st.session_state.l3_closer_spoken = False
+        # Clear any stale per-turn spoken flags from a previous attempt.
+        for k in list(st.session_state.keys()):
+            if isinstance(k, str) and k.startswith("l3_spoken_turn_"):
+                del st.session_state[k]
         st.session_state.l3_call_phase = "active"
         st.session_state.l3_started = True  # legacy flag, kept for resume_from_db
         st.session_state.l3_turn_idx = 0
@@ -197,7 +201,21 @@ def _render_active() -> None:
     # block that speaks ai_text, auto-arms the recorder, and stops on
     # silence. The returned audio_file is the UploadedFile from audio_input.
     mic_key = f"l3_mic_{st.session_state.l3_mic_nonce}"
-    audio_file = render_voice_turn(ai_text=ai_text, mic_key=mic_key)
+
+    # The TTS+VAD script should only run on the FIRST render of a turn.
+    # Subsequent renders of the same turn (most importantly the rerun that
+    # delivers the candidate's audio for transcription) must NOT re-speak
+    # the AI line - otherwise the previous turn's text starts replaying
+    # during the transcription window and gets cut off when the next
+    # turn finally renders. We track "did I already speak this turn?" by
+    # turn_idx because mic_nonce advances together with turn_idx.
+    turn_spoken_key = f"l3_spoken_turn_{turn_idx}"
+    should_speak_now = not st.session_state.get(turn_spoken_key, False)
+    audio_file = render_voice_turn(
+        ai_text=ai_text, mic_key=mic_key, speak=should_speak_now
+    )
+    if should_speak_now:
+        st.session_state[turn_spoken_key] = True
 
     st.markdown(
         '<div style="margin-top:18px;font-size:0.85rem;color:#94a3b8;">'

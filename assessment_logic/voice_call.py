@@ -42,6 +42,7 @@ def render_voice_turn(
     ai_text: str,
     mic_key: str,
     *,
+    speak: bool = True,
     silence_ms: int = 4000,
     hard_cap_seconds: int = 90,
     voice_hint: str = "en",
@@ -50,7 +51,13 @@ def render_voice_turn(
 
     Sequence:
       1. The candidate's audio_input widget is rendered (idle / waiting).
-      2. A components.html block speaks ai_text via Web Speech.
+      2. If `speak` is True: a components.html block speaks ai_text via
+         Web Speech, then auto-arms the recorder and runs VAD.
+         If `speak` is False: the audio_input widget is rendered but no
+         JS runs. This is used on the consuming rerun (when the
+         candidate's audio has just been delivered to Python and the
+         turn is about to advance) so the AI line doesn't replay while
+         transcription is in flight.
       3. On utterance end, JS programmatically clicks the recorder's start
          button. Then it asks getUserMedia for its own VAD stream.
       4. VAD watches RMS level. Once the level stays below threshold for
@@ -72,12 +79,13 @@ def render_voice_turn(
         # Older Streamlit without sample_rate kwarg.
         audio_file = st.audio_input("Microphone", **audio_input_kwargs)
 
-    _render_drive_script(
-        ai_text=ai_text,
-        silence_ms=silence_ms,
-        hard_cap_seconds=hard_cap_seconds,
-        voice_hint=voice_hint,
-    )
+    if speak:
+        _render_drive_script(
+            ai_text=ai_text,
+            silence_ms=silence_ms,
+            hard_cap_seconds=hard_cap_seconds,
+            voice_hint=voice_hint,
+        )
     return audio_file
 
 
