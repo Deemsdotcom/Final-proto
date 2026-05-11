@@ -82,6 +82,12 @@ def _migrate_final_scores(conn: sqlite3.Connection) -> None:
     DROP the old proactivity / learning_mindset columns because SQLite's
     ALTER TABLE DROP COLUMN is only available on 3.35+; instead we just
     stop writing to them. They'll sit at NULL for new rows.
+
+    Each ALTER is wrapped in try/except: SQLite's ADD COLUMN with NOT NULL
+    can fail unpredictably on populated tables across versions, and we
+    don't want a single column add taking down app startup. If a column
+    add fails the app still boots and writes to the missing column just
+    silently no-op.
     """
     cols = _existing_columns(conn, "final_scores")
     additions = [
@@ -92,8 +98,19 @@ def _migrate_final_scores(conn: sqlite3.Connection) -> None:
         ("ai_flag_layer2",    "INTEGER NOT NULL DEFAULT 0"),
     ]
     for name, decl in additions:
-        if name not in cols:
+        if name in cols:
+            continue
+        try:
             conn.execute(f"ALTER TABLE final_scores ADD COLUMN {name} {decl}")
+        except sqlite3.OperationalError as e:
+            # Common cause: NOT NULL DEFAULT on a populated table in some
+            # SQLite versions, or a phantom column the PRAGMA didn't see.
+            # Either way we keep going so the app boots.
+            import sys
+            print(
+                f"[migrate] skipped ALTER final_scores ADD COLUMN {name}: {e}",
+                file=sys.stderr,
+            )
 
 
 def _migrate_layer3_results(conn: sqlite3.Connection) -> None:
@@ -102,6 +119,9 @@ def _migrate_layer3_results(conn: sqlite3.Connection) -> None:
     v8.1 adds time-to-record tracking: how many seconds elapsed between
     the AI finishing the question and the candidate clicking record. Long
     pauses are flagged in the recruiter dashboard as a possible AI signal.
+
+    Same defensive try/except as _migrate_final_scores: don't take the
+    app down if one ALTER fails on a populated production DB.
     """
     cols = _existing_columns(conn, "layer3_results")
     additions = [
@@ -110,8 +130,16 @@ def _migrate_layer3_results(conn: sqlite3.Connection) -> None:
         ("typed_fallback_used", "INTEGER NOT NULL DEFAULT 0"),
     ]
     for name, decl in additions:
-        if name not in cols:
+        if name in cols:
+            continue
+        try:
             conn.execute(f"ALTER TABLE layer3_results ADD COLUMN {name} {decl}")
+        except sqlite3.OperationalError as e:
+            import sys
+            print(
+                f"[migrate] skipped ALTER layer3_results ADD COLUMN {name}: {e}",
+                file=sys.stderr,
+            )
 
 
 def init_db() -> bool:
