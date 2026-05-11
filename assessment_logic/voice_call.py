@@ -42,7 +42,7 @@ def render_voice_turn(
     ai_text: str,
     mic_key: str,
     *,
-    silence_ms: int = 1500,
+    silence_ms: int = 4000,
     hard_cap_seconds: int = 90,
     voice_hint: str = "en",
 ) -> Optional[object]:
