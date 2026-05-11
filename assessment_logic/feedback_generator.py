@@ -2,7 +2,27 @@
 
 from __future__ import annotations
 
+import re
+
 from .llm_client import chat_complete
+
+
+def _strip_code_fences(text: str) -> str:
+    """Remove leading/trailing markdown code fences from an LLM response.
+
+    The LLM sometimes wraps its output in ```markdown ... ``` even when the
+    prompt says "return as markdown". Without this, st.markdown renders
+    the whole answer as a code block (mono font, copy button, no list
+    bullets) instead of as styled markdown.
+    """
+    if not text:
+        return text
+    t = text.strip()
+    # Opening fence: ``` or ```markdown or ```md, possibly with a language hint.
+    t = re.sub(r"^```(?:[a-zA-Z]+)?\s*\n?", "", t)
+    # Closing fence at the end of the string.
+    t = re.sub(r"\n?```\s*$", "", t)
+    return t.strip()
 
 CANDIDATE_PROMPT = """You are providing developmental feedback to a consulting candidate who just completed an assessment. Be constructive, specific, and professional. Do NOT mention whether they would be hired. Focus on growth.
 
@@ -11,8 +31,7 @@ Their scores (0-100):
 - Layer 1 (Cognitive): {layer1} (Logical: {analytical}, Numerical: {numerical}, Verbal: {verbal})
 - Layer 2 (Staffing Simulation): {layer2} (Strategic: {strategic}, Adaptability: {adaptability})
 - Layer 3 (Interview): {layer3}
-    - Proactivity: {proactivity}
-    - Learning Mindset: {learning_mindset}
+    - Growth Driven Mindset: {growth_driven_mindset}
     - Adaptability: {l3_adaptability}
     - Collaboration: {collaboration}
     - Self-Reflection: {self_reflection}
@@ -22,7 +41,7 @@ Produce feedback with three sections:
 2. DEVELOPMENT AREAS: 2-3 bullet points on the weakest competencies, with actionable suggestions.
 3. OVERALL OBSERVATION: A short paragraph (3-4 sentences) giving a balanced perspective.
 
-Use plain, professional language. No jargon. Return as markdown."""
+Use plain, professional language. No jargon. Output markdown directly - do NOT wrap the response in triple backticks or any code fence. Begin with the first section heading."""
 
 RECRUITER_PROMPT = """You are summarizing a candidate's assessment for a hiring recruiter. Be direct, evidence-based, and decision-oriented.
 
@@ -31,8 +50,7 @@ Scores (0-100):
 - Layer 1 (Cognitive): {layer1} (Logical: {analytical}, Numerical: {numerical}, Verbal: {verbal})
 - Layer 2 (Staffing Simulation): {layer2} (Strategic: {strategic}, Adaptability: {adaptability})
 - Layer 3 (Interview): {layer3}
-    - Proactivity: {proactivity}
-    - Learning Mindset: {learning_mindset}
+    - Growth Driven Mindset: {growth_driven_mindset}
     - Adaptability: {l3_adaptability}
     - Collaboration: {collaboration}
     - Self-Reflection: {self_reflection}
@@ -48,6 +66,18 @@ Return as markdown."""
 
 
 def _format_args(scores: dict) -> dict:
+    # v5 merged proactivity + learning_mindset into one growth_driven_mindset
+    # competency. For legacy rows that still have the old columns populated,
+    # use whichever of them is non-zero as the fallback so old candidates
+    # don't suddenly look worse than they did.
+    growth = scores.get("competency_l3_growth_driven_mindset")
+    if growth is None or growth == 0:
+        legacy = (
+            (scores.get("competency_l3_proactivity") or 0)
+            + (scores.get("competency_l3_learning_mindset") or 0)
+        )
+        if legacy:
+            growth = round(legacy / 2, 2)
     return dict(
         overall=scores["overall_score"],
         layer1=scores["layer1_score"],
@@ -58,8 +88,7 @@ def _format_args(scores: dict) -> dict:
         verbal=scores.get("competency_verbal", 0),
         strategic=scores.get("competency_strategic", 0),
         adaptability=scores.get("competency_adaptability", 0),
-        proactivity=scores.get("competency_l3_proactivity", 0),
-        learning_mindset=scores.get("competency_l3_learning_mindset", 0),
+        growth_driven_mindset=growth or 0,
         l3_adaptability=scores.get("competency_l3_adaptability", 0),
         collaboration=scores.get("competency_l3_collaboration", 0),
         self_reflection=scores.get("competency_l3_self_reflection", 0),
@@ -73,14 +102,17 @@ def _rule_based_candidate_feedback(scores: dict) -> str:
     'we had a problem' message. Uses simple thresholds to identify top and
     bottom competencies and writes a short narrative.
     """
+    # Reuse the v5-aware Growth Driven Mindset value from _format_args so
+    # the rule-based fallback ranks competencies the same way the LLM
+    # prompt does.
+    growth_val = _format_args(scores)["growth_driven_mindset"]
     competencies = {
         "Logical reasoning": scores.get("competency_analytical", 0) or 0,
         "Numerical reasoning": scores.get("competency_numerical", 0) or 0,
         "Verbal reasoning": scores.get("competency_verbal", 0) or 0,
         "Strategic thinking": scores.get("competency_strategic", 0) or 0,
         "Adaptability under pressure": scores.get("competency_adaptability", 0) or 0,
-        "Proactivity": scores.get("competency_l3_proactivity", 0) or 0,
-        "Learning mindset": scores.get("competency_l3_learning_mindset", 0) or 0,
+        "Growth driven mindset": growth_val or 0,
         "Adaptability (interview)": scores.get("competency_l3_adaptability", 0) or 0,
         "Collaboration": scores.get("competency_l3_collaboration", 0) or 0,
         "Self-reflection": scores.get("competency_l3_self_reflection", 0) or 0,
@@ -138,7 +170,7 @@ def _rule_based_candidate_feedback(scores: dict) -> str:
 def generate_candidate_feedback(scores: dict) -> str:
     prompt = CANDIDATE_PROMPT.format(**_format_args(scores))
     try:
-        return chat_complete(prompt, temperature=0.3, max_tokens=600)
+        return _strip_code_fences(chat_complete(prompt, temperature=0.3, max_tokens=600))
     except Exception as e:
         # AI call failed (most often Azure DeploymentNotFound). Fall back to
         # a real rule-based summary so the candidate still sees useful feedback.
@@ -152,6 +184,6 @@ def generate_recruiter_summary(scores: dict) -> str:
     args["top_fit_label"] = "Yes" if scores.get("top_fit") else "No"
     prompt = RECRUITER_PROMPT.format(**args)
     try:
-        return chat_complete(prompt, temperature=0.0, max_tokens=500)
+        return _strip_code_fences(chat_complete(prompt, temperature=0.0, max_tokens=500))
     except Exception as e:
         return f"*Recruiter summary generation failed: {type(e).__name__}*"

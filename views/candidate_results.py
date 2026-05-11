@@ -167,10 +167,15 @@ def _render_candidate_view(scores: dict) -> None:
 
     st.divider()
 
-    # LLM-generated feedback
+    # LLM-generated feedback. Strip any leading / trailing markdown code
+    # fences in case the saved string still has them (older LLM runs
+    # wrapped the answer in ```markdown ... ``` which made st.markdown
+    # render the whole thing as a code block).
     st.subheader("Your developmental feedback")
-    if scores.get("candidate_feedback"):
-        st.markdown(scores["candidate_feedback"])
+    fb = scores.get("candidate_feedback") or ""
+    if fb:
+        from assessment_logic.feedback_generator import _strip_code_fences
+        st.markdown(_strip_code_fences(fb))
     else:
         st.info("Personalized feedback is still being generated. Please refresh in a moment.")
 
