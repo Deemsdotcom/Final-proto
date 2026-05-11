@@ -1,8 +1,9 @@
 """Layer 3 logic: AI-led structured behavioral interview.
 
-Scores 5 competencies (A10, A1, A12, A6, A15) on a 0-20 scale, summing
-to a Layer 3 total of 0-100. One question per competency (randomly
-chosen from a bank of 5), one targeted follow-up per question.
+Scores 4 competencies (A1+A10 merged into Growth Driven Mindset, A12, A6,
+A15) on a 0-25 scale, summing to a Layer 3 total of 0-100. One question
+per competency (randomly chosen from a bank of 5), one targeted follow-up
+per question.
 
 Question selection is seeded by candidate_id for reproducibility.
 LLM-driven follow-up generation and rubric scoring use temperature=0.
@@ -20,26 +21,26 @@ from typing import List, Tuple
 from .llm_client import chat_complete
 
 QUESTIONS_PATH = Path(__file__).parent.parent / "data" / "interview_questions.json"
-PER_QUESTION_SECONDS = 120  # 2 min per answer; 5 competencies x (main+followup) ~= 20 min
+PER_QUESTION_SECONDS = 120  # 2 min per answer; 4 competencies x (main+followup) ~= 16 min
 
 
 def _load_competencies() -> list[dict]:
     if not QUESTIONS_PATH.exists():
         raise FileNotFoundError(
-            f"Missing {QUESTIONS_PATH}. Expected JSON with 5 competencies."
+            f"Missing {QUESTIONS_PATH}. Expected JSON with 4 competencies."
         )
     with open(QUESTIONS_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)
     comps = data.get("competencies", [])
-    if len(comps) != 5:
+    if len(comps) != 4:
         raise ValueError(
-            f"Expected 5 competencies in {QUESTIONS_PATH}, got {len(comps)}."
+            f"Expected 4 competencies in {QUESTIONS_PATH}, got {len(comps)}."
         )
     return comps
 
 
 COMPETENCIES = _load_competencies()
-COMPETENCY_COUNT = len(COMPETENCIES)  # 5
+COMPETENCY_COUNT = len(COMPETENCIES)  # 4
 # kept for backward-compat with views/state.py that references this name
 MAIN_QUESTIONS_COUNT = COMPETENCY_COUNT
 
@@ -68,7 +69,7 @@ Return ONLY a JSON object in this exact format, no preamble or markdown:
 {{"bucket": "<A|B|C|D>", "question": "<the follow-up question>"}}"""
 
 
-SCORING_PROMPT = """You are scoring a candidate's answer for the competency "{competency_name}" on a 0-20 scale. Be strict, evidence-based, and use the full scale. Do not compress scores toward the middle.
+SCORING_PROMPT = """You are scoring a candidate's answer for the competency "{competency_name}" on a 0-25 scale. Be strict, evidence-based, and use the full scale. Do not compress scores toward the middle.
 
 Main question: "{main_question}"
 Main answer: "{main_transcript}"
@@ -78,18 +79,18 @@ Follow-up answer: "{followup_transcript}"
 
 What the follow-up was trying to surface: {followup_goal}
 
-Use these anchor points as reference. Whole numbers between anchors (e.g. 7, 12, 17) are encouraged when the candidate falls between levels.
+Use these anchor points as reference. Whole numbers between anchors are encouraged when the candidate falls between levels.
 
-0  — No evidence: Generic, off-topic, or no example provided.
-5  — Weak: A situation was mentioned but vague, no clear personal contribution or outcome.
-10 — Adequate: Clear example with some personal ownership, basic reflection. Meets the bar.
-15 — Strong: Specific example, clear personal contribution, meaningful outcome, genuine reflection.
-20 — Exceptional: Outstanding specificity, deep self-awareness, behavioral change demonstrated, highly credible and nuanced.
+0  - No evidence: Generic, off-topic, or no example provided.
+6  - Weak: A situation was mentioned but vague, no clear personal contribution or outcome.
+13 - Adequate: Clear example with some personal ownership, basic reflection. Meets the bar.
+19 - Strong: Specific example, clear personal contribution, meaningful outcome, genuine reflection.
+25 - Exceptional: Outstanding specificity, deep self-awareness, behavioral change demonstrated, highly credible and nuanced.
 
-Also flag whether the answer appears scripted (perfect STAR structure with no emotional texture, identical phrasing patterns, sounds rehearsed). Scripted does NOT mean low-scoring on its own — flag for human review only.
+Also flag whether the answer appears scripted (perfect STAR structure with no emotional texture, identical phrasing patterns, sounds rehearsed). Scripted does NOT mean low-scoring on its own - flag for human review only.
 
 Return ONLY a JSON object in this exact format, no preamble or markdown:
-{{"score": <integer 0-20>, "scripted_flag": <true|false>, "rationale": "<one short sentence>"}}"""
+{{"score": <integer 0-25>, "scripted_flag": <true|false>, "rationale": "<one short sentence>"}}"""
 
 
 GENERIC_FALLBACK_FOLLOWUP = {
@@ -191,12 +192,12 @@ def score_competency(
     competency_name: str,
     followup_goal: str,
 ) -> dict:
-    """Score a competency on 0-20 based on both the main answer and the follow-up.
+    """Score a competency on 0-25 based on both the main answer and the follow-up.
 
-    Returns {"score": int 0-20, "scripted_flag": bool, "rationale": str}.
-    On LLM failure, returns score=10 (the "adequate" anchor) without a flag.
+    Returns {"score": int 0-25, "scripted_flag": bool, "rationale": str}.
+    On LLM failure, returns score=13 (the "adequate" anchor) without a flag.
     """
-    default = {"score": 10, "scripted_flag": False, "rationale": "Default: scoring failed."}
+    default = {"score": 13, "scripted_flag": False, "rationale": "Default: scoring failed."}
 
     # If both transcripts are essentially empty, that's "no evidence".
     main_clean = (main_transcript or "").strip()
@@ -222,10 +223,10 @@ def score_competency(
         return default
 
     try:
-        score = int(parsed.get("score", 10))
+        score = int(parsed.get("score", 13))
     except (ValueError, TypeError):
-        score = 10
-    score = max(0, min(20, score))
+        score = 13
+    score = max(0, min(25, score))
 
     scripted_flag = bool(parsed.get("scripted_flag", False))
     rationale = str(parsed.get("rationale", "")).strip()[:300]
@@ -258,17 +259,24 @@ def aggregate_layer3(
     """Returns (layer3_total_0_100, competency_dict_for_final_scores).
 
     competency_scores: list of dicts each with at least
-      {"competency_key": str, "score": int 0-20}.
+      {"competency_key": str, "score": int 0-25}.
 
-    Each per-competency score (0-20) is also scaled to 0-100 in the
+    Each per-competency score (0-25) is also scaled to 0-100 in the
     competency dict so it's directly comparable with Layer 1/2 competencies
-    in the recruiter dashboard radar.
-    """
-    keys = ("proactivity", "learning_mindset", "adaptability",
-            "collaboration", "self_reflection")
+    in the recruiter dashboard radar. Scale factor is 4 (25 * 4 = 100).
 
+    The active key set is 4 competencies (growth_driven_mindset,
+    adaptability, collaboration, self_reflection). The legacy keys
+    (proactivity, learning_mindset) are kept in the output dict at 0.0
+    so historical schema/columns still receive a numeric value.
+    """
+    keys = ("growth_driven_mindset", "adaptability",
+            "collaboration", "self_reflection")
+    legacy_keys = ("proactivity", "learning_mindset")
+
+    empty = {f"competency_l3_{k}": 0.0 for k in keys + legacy_keys}
     if not competency_scores:
-        return 0.0, {f"competency_l3_{k}": 0.0 for k in keys}
+        return 0.0, empty
 
     total = sum(int(s.get("score", 0)) for s in competency_scores)
     total = max(0, min(100, total))
@@ -278,9 +286,9 @@ def aggregate_layer3(
         key = s.get("competency_key")
         if not key:
             continue
-        comp_dict[f"competency_l3_{key}"] = round(int(s.get("score", 0)) * 5, 2)
+        comp_dict[f"competency_l3_{key}"] = round(int(s.get("score", 0)) * 4, 2)
 
-    for key in keys:
+    for key in keys + legacy_keys:
         comp_dict.setdefault(f"competency_l3_{key}", 0.0)
 
     return float(total), comp_dict
@@ -288,33 +296,34 @@ def aggregate_layer3(
 
 # ---- Recruiter persona patter (used by the in-call view) ----
 #
-# These lines are spoken by the AI between the fixed rubric questions. They
-# are NEW conversational glue, not part of the rubric content - the actual
-# question wording (loaded from data/interview_questions.json) and the
-# scoring rubric are untouched.
+# These lines are spoken by the AI between the fixed rubric questions. The
+# wording follows the persona rules in the v5 prompt doc: warm but
+# professional, concise, no explanation of why a question is being asked,
+# and the exact closing line from the doc.
 
 RECRUITER_OPENER = (
-    "Hi, thanks for joining the call. I am your AI interviewer from Capgemini Invent. "
-    "I am going to ask you five short questions about how you work. "
-    "There are no right or wrong answers - just speak as openly as you can, "
-    "and take a moment to think before answering if you need to. "
+    "Hi, thanks for joining the call. I am your AI interviewer for Capgemini Invent. "
+    "We will go through a few short questions about how you work, about sixteen minutes in total. "
+    "There are no right or wrong answers - just speak openly, "
+    "and take a moment to think before you answer if you need to. "
     "Here is the first one."
 )
 
+# Verbatim closer from the v5 prompt doc (em-dash replaced with a hyphen
+# to match the codebase house style).
 RECRUITER_CLOSER = (
-    "That is everything from me. Thanks for the conversation. "
-    "You can click End call now to finish, and your results will be ready shortly."
+    "Thank you - that is everything we need for now. "
+    "A member of the Capgemini Invent team will be in touch about next steps."
 )
 
 
 def transition_line(question_idx_zero_based: int) -> str:
-    """Short patter between competencies. question_idx is 0..4 (Q1..Q5)."""
+    """Short patter between competencies. question_idx is 0..3 (Q1..Q4)."""
     options = [
         "",  # Q1: opener already covers the intro, no extra transition
-        "Thanks. Here is the next one.",
+        "Thanks, that's helpful. Here is the next one.",
         "Got it. Moving on.",
-        "Appreciate that. Next question.",
-        "Thanks for sharing. One more area I want to explore.",
+        "Thanks for sharing. One more area I want to cover.",
     ]
     if 0 <= question_idx_zero_based < len(options):
         return options[question_idx_zero_based]
@@ -324,11 +333,10 @@ def transition_line(question_idx_zero_based: int) -> str:
 def acknowledge_line(competency_idx_zero_based: int) -> str:
     """Short acknowledgement spoken right before the follow-up question."""
     options = [
-        "Thanks for that.",
-        "Okay.",
+        "Thanks, that's helpful.",
         "Got it.",
+        "Okay.",
         "Understood.",
-        "Right.",
     ]
     if 0 <= competency_idx_zero_based < len(options):
         return options[competency_idx_zero_based]

@@ -382,11 +382,13 @@ def test_assemble_final_scores_structure():
         l1_comp={"competency_analytical": 75, "competency_numerical": 75, "competency_verbal": 75},
         l2_comp={"competency_strategic": 80, "competency_adaptability": 80},
         l3_comp={
-            "competency_l3_proactivity": 70,
-            "competency_l3_learning_mindset": 70,
+            "competency_l3_growth_driven_mindset": 70,
             "competency_l3_adaptability": 70,
             "competency_l3_collaboration": 70,
             "competency_l3_self_reflection": 70,
+            # legacy keys still accepted for back-compat with old rows
+            "competency_l3_proactivity": 70,
+            "competency_l3_learning_mindset": 70,
         },
         candidate_feedback="feedback",
         recruiter_summary="summary",
@@ -394,6 +396,7 @@ def test_assemble_final_scores_structure():
     assert data["candidate_id"] == "cid-1"
     assert data["top_fit"] == 1
     assert "overall_score" in data
+    assert data["competency_l3_growth_driven_mindset"] == 70
     assert data["competency_l3_proactivity"] == 70
 
 
@@ -401,26 +404,29 @@ def test_assemble_final_scores_structure():
 
 def test_aggregate_layer3_sums_to_100():
     from assessment_logic import layer3_logic
+    # v5: 4 competencies, scored 0-25 each, total 0-100.
     competency_scores = [
-        {"competency_key": "proactivity", "score": 14},
-        {"competency_key": "learning_mindset", "score": 12},
-        {"competency_key": "adaptability", "score": 10},
-        {"competency_key": "collaboration", "score": 16},
-        {"competency_key": "self_reflection", "score": 8},
+        {"competency_key": "growth_driven_mindset", "score": 18},
+        {"competency_key": "adaptability", "score": 13},
+        {"competency_key": "collaboration", "score": 20},
+        {"competency_key": "self_reflection", "score": 9},
     ]
     total, comp = layer3_logic.aggregate_layer3(competency_scores)
-    assert total == 60.0  # 14+12+10+16+8
-    # individual scores scaled to 0-100
-    assert comp["competency_l3_proactivity"] == 70.0
-    assert comp["competency_l3_self_reflection"] == 40.0
+    assert total == 60.0  # 18+13+20+9
+    # individual scores scaled to 0-100 (factor 4 since each is 0-25)
+    assert comp["competency_l3_growth_driven_mindset"] == 72.0
+    assert comp["competency_l3_self_reflection"] == 36.0
 
 
 def test_aggregate_layer3_empty():
     from assessment_logic import layer3_logic
     total, comp = layer3_logic.aggregate_layer3([])
     assert total == 0.0
-    assert comp["competency_l3_proactivity"] == 0.0
+    # v5 keys
+    assert comp["competency_l3_growth_driven_mindset"] == 0.0
     assert comp["competency_l3_self_reflection"] == 0.0
+    # legacy keys still present for back-compat
+    assert comp["competency_l3_proactivity"] == 0.0
 
 
 def test_interpret_total_bands():

@@ -111,7 +111,7 @@ def _render_intro() -> None:
     ui.eyebrow("Layer 3 · AI-led interview")
     ui.page_title(
         "Voice call with an AI recruiter",
-        subtitle="Five short questions, around twenty minutes. Speak openly - there are no right or wrong answers.",
+        subtitle="Four short questions, around sixteen minutes. Speak openly - there are no right or wrong answers.",
     )
 
     with ui.card(eyebrow_text="Before you begin"):

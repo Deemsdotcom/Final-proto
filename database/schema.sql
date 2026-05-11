@@ -69,8 +69,9 @@ CREATE TABLE IF NOT EXISTS final_scores (
     competency_verbal REAL,
     competency_strategic REAL,
     competency_adaptability REAL,
-    competency_l3_proactivity REAL,
-    competency_l3_learning_mindset REAL,
+    competency_l3_proactivity REAL,             -- legacy (pre-v5)
+    competency_l3_learning_mindset REAL,        -- legacy (pre-v5)
+    competency_l3_growth_driven_mindset REAL,   -- v5: merged A1+A10
     competency_l3_adaptability REAL,
     competency_l3_collaboration REAL,
     competency_l3_self_reflection REAL,

@@ -80,6 +80,7 @@ def assemble_final_scores(
         "competency_adaptability": l2_comp.get("competency_adaptability"),
         "competency_l3_proactivity": l3_comp.get("competency_l3_proactivity"),
         "competency_l3_learning_mindset": l3_comp.get("competency_l3_learning_mindset"),
+        "competency_l3_growth_driven_mindset": l3_comp.get("competency_l3_growth_driven_mindset"),
         "competency_l3_adaptability": l3_comp.get("competency_l3_adaptability"),
         "competency_l3_collaboration": l3_comp.get("competency_l3_collaboration"),
         "competency_l3_self_reflection": l3_comp.get("competency_l3_self_reflection"),

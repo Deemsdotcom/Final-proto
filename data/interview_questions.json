@@ -1,30 +1,17 @@
 {
   "competencies": [
     {
-      "id": "A10",
-      "key": "proactivity",
-      "name": "Proactivity / Initiative",
+      "id": "A1+A10",
+      "key": "growth_driven_mindset",
+      "name": "Growth Driven Mindset",
       "questions": [
+        "What's something you've taught yourself or started in the past year - a book, a course, a side project, anything - not because you had to, but because you wanted to? How did you go about it, and what did you get out of it?",
+        "Tell me about a time you deliberately took on something you weren't sure you could pull off. What pushed you to try, and what did you take away from it?",
+        "Describe a moment where you realized you had a significant gap in your knowledge or skills. How did you respond?",
         "Tell me about a time you identified a problem or opportunity that nobody asked you to deal with. What did you do?",
-        "Describe a situation where you went beyond what was expected of you. What drove you to do that?",
-        "Tell me about a time you spotted something that wasn't working and decided to do something about it, even without being asked.",
-        "When have you created something — a process, a project, an idea — from scratch because you saw a gap?",
-        "Describe a time you took ownership of something that was technically outside your responsibility. Why did you step up?"
+        "When have you created something - a process, a project, an idea - from scratch because you saw a gap?"
       ],
       "followup_goal": "Find out if they actually drove it forward or just noticed it. Look for ownership of the outcome, not just the observation."
-    },
-    {
-      "id": "A1",
-      "key": "learning_mindset",
-      "name": "Learning Mindset / Hunger to Grow",
-      "questions": [
-        "What's something you've deliberately taught yourself in the past year — not for an exam, but because you wanted to? How did you go about it?",
-        "Tell me about a time you actively sought out feedback or a new perspective, even when you didn't have to. What did you do with it?",
-        "Describe a moment where you realized you had a significant gap in your knowledge or skills. How did you respond?",
-        "What's the last thing you pursued purely out of curiosity — a book, a course, a side project — and what did you get out of it?",
-        "Tell me about a time you changed your mind about something important because of something you learned. What shifted?"
-      ],
-      "followup_goal": "Distinguish genuine curiosity from performance of curiosity. Look for self-direction, specificity, and whether they can describe their own learning process."
     },
     {
       "id": "A12",
@@ -48,7 +35,7 @@
         "Describe a situation where your team was struggling to work together. What did you do?",
         "Tell me about a time you had to put the team's goal ahead of your own preference or idea. How did you approach that?",
         "When have you had to build trust or a working relationship quickly with people you didn't know? What did you do?",
-        "Describe a time when you helped someone else on your team succeed — not because it was your job, but because you saw they needed it."
+        "Describe a time when you helped someone else on your team succeed - not because it was your job, but because you saw they needed it."
       ],
       "followup_goal": "Look for genuine team orientation, not just the ability to tolerate others. Find out if they adapt their behavior for the team, or just describe cooperation as a value."
     },
@@ -61,9 +48,9 @@
         "Describe a time when you realized your own assumptions were wrong. What did you do when you figured that out?",
         "Tell me about a failure or near-failure. What happened, and what did you change afterward?",
         "When have you actively sought out criticism on your own work? How did you use it?",
-        "Tell me about a time you had to admit you'd made a mistake — to someone else or to yourself. What did that look like?"
+        "Tell me about a time you had to admit you'd made a mistake - to someone else or to yourself. What did that look like?"
       ],
-      "followup_goal": "Distinguish candidates who genuinely integrate feedback from those who just say they do. Look for specificity — what changed in their actual behavior."
+      "followup_goal": "Distinguish candidates who genuinely integrate feedback from those who just say they do. Look for specificity - what changed in their actual behavior."
     }
   ]
 }

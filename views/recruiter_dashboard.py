@@ -36,7 +36,7 @@ def render() -> None:
 
         st.markdown("**Competency thresholds**")
         min_comp_strategic = st.slider("Min strategic", 0, 100, 0)
-        min_comp_proactivity = st.slider("Min L3 proactivity", 0, 100, 0)
+        min_comp_growth = st.slider("Min L3 Growth Driven Mindset", 0, 100, 0)
 
         if not df.empty:
             date_min = df["completed_at_dt"].min().date()
@@ -62,7 +62,7 @@ def render() -> None:
     filtered = filtered[filtered["layer2_score"] >= min_l2]
     filtered = filtered[filtered["layer3_score"] >= min_l3]
     filtered = filtered[filtered["competency_strategic"].fillna(0) >= min_comp_strategic]
-    filtered = filtered[filtered["competency_l3_proactivity"].fillna(0) >= min_comp_proactivity]
+    filtered = filtered[filtered[["competency_l3_growth_driven_mindset", "competency_l3_proactivity", "competency_l3_learning_mindset"]].fillna(0).max(axis=1) >= min_comp_growth]
     if name_search:
         filtered = filtered[filtered["full_name"].str.contains(name_search, case=False, na=False)]
     if top_fit_only:
@@ -171,11 +171,19 @@ def _render_deep_dive(candidate_id: str) -> None:
     cols[2].metric("Layer 2", f"{scores['layer2_score']:.1f}")
     cols[3].metric("Layer 3", f"{scores['layer3_score']:.1f}")
 
-    # Competency radar
+    # Competency radar. Layer 3 columns are the v5 set (4 keys); legacy
+    # rows (proactivity / learning_mindset) fall back into the merged
+    # Growth Driven Mindset petal so historical candidates still render.
+    legacy_growth = (
+        scores.get("competency_l3_proactivity")
+        or scores.get("competency_l3_learning_mindset")
+        or 0
+    )
+    growth = scores.get("competency_l3_growth_driven_mindset") or legacy_growth or 0
     comp_labels = [
         "Analytical", "Numerical", "Verbal",
         "Strategic", "Adaptability (sim)",
-        "Proactivity", "Learning Mindset", "Adaptability (interview)",
+        "Growth Driven Mindset", "Adaptability (interview)",
         "Collaboration", "Self-Reflection",
     ]
     comp_values = [
@@ -184,8 +192,7 @@ def _render_deep_dive(candidate_id: str) -> None:
         scores.get("competency_verbal") or 0,
         scores.get("competency_strategic") or 0,
         scores.get("competency_adaptability") or 0,
-        scores.get("competency_l3_proactivity") or 0,
-        scores.get("competency_l3_learning_mindset") or 0,
+        growth,
         scores.get("competency_l3_adaptability") or 0,
         scores.get("competency_l3_collaboration") or 0,
         scores.get("competency_l3_self_reflection") or 0,
@@ -318,7 +325,7 @@ def _render_deep_dive(candidate_id: str) -> None:
 
             score = r.get("competency_score")
             if score is not None:
-                st.metric("Score (0–20)", f"{score}")
+                st.metric("Score (0-25)", f"{score}")
             if r.get("rationale"):
                 st.caption(f"Scoring rationale: {r['rationale']}")
 

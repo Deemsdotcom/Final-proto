@@ -126,6 +126,19 @@ def init_db() -> bool:
         with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
             conn.executescript(f.read())
 
+        # In-place migration for existing databases: add the
+        # competency_l3_growth_driven_mindset column if it doesn't exist
+        # yet. SQLite's ALTER TABLE ADD COLUMN has no IF NOT EXISTS, so
+        # we catch the OperationalError ("duplicate column") on subsequent
+        # boots. Safe to run on every init.
+        try:
+            conn.execute(
+                "ALTER TABLE final_scores "
+                "ADD COLUMN competency_l3_growth_driven_mindset REAL"
+            )
+        except Exception:
+            pass
+
         # Race-safe seed: INSERT OR IGNORE silently no-ops if another
         # concurrent init_db() (different Streamlit session, same SQLite
         # file) already inserted the row. cur.rowcount is 1 on success,
@@ -382,6 +395,7 @@ def save_final_score(data: dict) -> None:
         "overall_score", "competency_analytical", "competency_numerical",
         "competency_verbal", "competency_strategic", "competency_adaptability",
         "competency_l3_proactivity", "competency_l3_learning_mindset",
+        "competency_l3_growth_driven_mindset",
         "competency_l3_adaptability", "competency_l3_collaboration",
         "competency_l3_self_reflection",
         "top_fit", "recruiter_summary", "candidate_feedback",
@@ -411,6 +425,7 @@ def get_all_completed_candidates() -> list[dict]:
                       f.competency_analytical, f.competency_numerical, f.competency_verbal,
                       f.competency_strategic, f.competency_adaptability,
                       f.competency_l3_proactivity, f.competency_l3_learning_mindset,
+                      f.competency_l3_growth_driven_mindset,
                       f.competency_l3_adaptability, f.competency_l3_collaboration,
                       f.competency_l3_self_reflection,
                       f.top_fit, f.recruiter_summary, f.candidate_feedback
