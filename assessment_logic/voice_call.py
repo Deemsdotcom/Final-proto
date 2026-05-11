@@ -382,3 +382,42 @@ def release_call_mic() -> None:
         "</script>",
         height=0,
     )
+
+
+def prewarm_tts() -> None:
+    """Kick the browser's TTS engine so voices are cached by Begin call.
+
+    Renders an invisible components.html block that does three things:
+    1. Calls getVoices() to start asynchronous voice loading.
+    2. Listens for the voiceschanged event so the browser actually
+       commits to loading the voices list (some browsers won't load
+       until something subscribes).
+    3. Speaks one silent (volume=0) very short utterance which forces
+       the speech synthesis pipeline to spin up. The candidate hears
+       nothing; the engine is warm when the call starts.
+
+    Call this on every pre-call screen that the candidate sits on
+    before clicking Begin call (the Layer 3 intro). Cost: zero API
+    calls, less than 1ms of CPU, completely silent to the candidate.
+    """
+    components.html(
+        "<script>"
+        "(function(){"
+        "try{"
+        "if(!('speechSynthesis' in window))return;"
+        "const w=window.parent||window;"
+        "if(w.__capTtsWarmed)return;"
+        "w.__capTtsWarmed=true;"
+        "try{window.speechSynthesis.getVoices();}catch(e){}"
+        "try{window.speechSynthesis.addEventListener('voiceschanged',function(){},{once:true});}catch(e){}"
+        "try{"
+        "const u=new SpeechSynthesisUtterance(' ');"
+        "u.volume=0;u.rate=10;"
+        "window.speechSynthesis.speak(u);"
+        "setTimeout(function(){try{window.speechSynthesis.cancel();}catch(e){}},150);"
+        "}catch(e){}"
+        "}catch(e){}"
+        "})();"
+        "</script>",
+        height=0,
+    )

@@ -43,7 +43,7 @@ from assessment_logic.layer3_logic import (
     transition_line,
 )
 from assessment_logic.llm_client import transcribe_audio
-from assessment_logic.voice_call import release_call_mic, render_silent_turn, render_voice_turn
+from assessment_logic.voice_call import prewarm_tts, release_call_mic, render_silent_turn, render_voice_turn
 from database import db
 
 from . import _design as ui
@@ -113,6 +113,11 @@ def _render_intro() -> None:
         "Voice call with an AI recruiter",
         subtitle="Four short questions, around sixteen minutes. Speak openly - there are no right or wrong answers.",
     )
+
+    # Quietly warm the browser's TTS engine while the candidate reads the
+    # prep copy below. Saves ~400ms on the first turn (the opener) where
+    # otherwise we'd be waiting on the voices-loaded fallback timer.
+    prewarm_tts()
 
     with ui.card(eyebrow_text="Before you begin"):
         st.markdown(
