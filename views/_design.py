@@ -1438,6 +1438,15 @@ def question_progress_bar(idx: int, total: int, remaining: int, seconds: int,
     else:
         tone = "tone-crit"
 
+    # Format the countdown: MM:SS when remaining >= 60, otherwise 'Ns'.
+    # This keeps the visual compact when theme-level timers run up to
+    # 20+ minutes and still reads naturally in the last minute.
+    if remaining >= 60:
+        mins, secs = divmod(int(remaining), 60)
+        time_str = f"{mins}:{secs:02d} left"
+    else:
+        time_str = f"{int(remaining)}s left"
+
     html = (
         '<div class="cap-q-eyebrow">' + _esc(eyebrow_text) + '</div>'
         '<div class="cap-q-bar">'
@@ -1445,7 +1454,7 @@ def question_progress_bar(idx: int, total: int, remaining: int, seconds: int,
         'style="width:' + str(pct) + '%"></div></div>'
         '<span class="cap-q-timer ' + tone + '">'
         '<span class="dot"></span>'
-        + str(remaining) + 's left'
+        + time_str +
         '</span>'
         '</div>'
     )
