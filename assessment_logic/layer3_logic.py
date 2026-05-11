@@ -284,3 +284,52 @@ def aggregate_layer3(
         comp_dict.setdefault(f"competency_l3_{key}", 0.0)
 
     return float(total), comp_dict
+
+
+# ---- Recruiter persona patter (used by the in-call view) ----
+#
+# These lines are spoken by the AI between the fixed rubric questions. They
+# are NEW conversational glue, not part of the rubric content - the actual
+# question wording (loaded from data/interview_questions.json) and the
+# scoring rubric are untouched.
+
+RECRUITER_OPENER = (
+    "Hi, thanks for joining the call. I am your AI interviewer from Capgemini Invent. "
+    "I am going to ask you five short questions about how you work. "
+    "There are no right or wrong answers - just speak as openly as you can, "
+    "and take a moment to think before answering if you need to. "
+    "Here is the first one."
+)
+
+RECRUITER_CLOSER = (
+    "That is everything from me. Thanks for the conversation. "
+    "You can click End call now to finish, and your results will be ready shortly."
+)
+
+
+def transition_line(question_idx_zero_based: int) -> str:
+    """Short patter between competencies. question_idx is 0..4 (Q1..Q5)."""
+    options = [
+        "",  # Q1: opener already covers the intro, no extra transition
+        "Thanks. Here is the next one.",
+        "Got it. Moving on.",
+        "Appreciate that. Next question.",
+        "Thanks for sharing. One more area I want to explore.",
+    ]
+    if 0 <= question_idx_zero_based < len(options):
+        return options[question_idx_zero_based]
+    return "Next question."
+
+
+def acknowledge_line(competency_idx_zero_based: int) -> str:
+    """Short acknowledgement spoken right before the follow-up question."""
+    options = [
+        "Thanks for that.",
+        "Okay.",
+        "Got it.",
+        "Understood.",
+        "Right.",
+    ]
+    if 0 <= competency_idx_zero_based < len(options):
+        return options[competency_idx_zero_based]
+    return "Thanks."

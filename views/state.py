@@ -48,6 +48,16 @@ def init_session_state() -> None:
         "l3_answer_scores": [],
         "l3_question_started_at": None,
         "l3_last_transcript": None,
+        # Layer 3 voice-call state (new in the call rebuild)
+        "l3_call_phase": "intro",        # intro / active / closing / scoring / done
+        "l3_turn_idx": 0,
+        "l3_main_transcripts": {},
+        "l3_followups": {},
+        "l3_followup_transcripts": {},
+        "l3_mic_nonce": 0,
+        "l3_consumed_fingerprint": None,
+        "l3_closer_spoken": False,
+        "l3_closing_started_at": None,
 
         # Results cache
         "final_result_computed": False,
@@ -67,6 +77,9 @@ def reset_candidate_state() -> None:
         "l3_started", "l3_main_questions", "l3_question_idx", "l3_phase",
         "l3_current_followup", "l3_answer_scores", "l3_question_started_at",
         "l3_last_transcript",
+        "l3_call_phase", "l3_turn_idx", "l3_main_transcripts", "l3_followups",
+        "l3_followup_transcripts", "l3_mic_nonce", "l3_consumed_fingerprint",
+        "l3_closer_spoken", "l3_closing_started_at",
         "final_result_computed",
     ]
     for k in keys:

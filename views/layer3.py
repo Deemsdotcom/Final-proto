@@ -1,13 +1,29 @@
-"""Layer 3 view: AI-led structured behavioral interview.
+"""Layer 3 view: AI-led interview rebuilt as a hands-free voice call.
 
-Flow per competency:
-  1. Show the main question. Candidate records (or types) their answer.
-  2. LLM picks a follow-up bucket and writes the follow-up.
-  3. Candidate records (or types) their follow-up answer.
-  4. LLM scores the competency 0-20 based on both exchanges.
-  5. Save row, advance to next competency.
+Flow:
+  1. Pre-call intro. Candidate clicks Begin call.
+  2. In-call: the AI speaks one utterance via Web Speech, the recorder
+     auto-arms, in-browser VAD watches the mic and auto-stops on ~1.5s of
+     silence. Candidate never clicks anything during the conversation, never
+     sees a transcript, never sees the question text on screen.
+  3. Closer: the AI says goodbye, then we run all five competency-level
+     scoring passes (existing rubric, untouched).
+  4. Complete confirmation screen.
 
-5 competencies total -> Layer 3 score is 0-100.
+Turn machine: ten listen turns per call (5 main questions + 5 AI follow-ups).
+  comp_idx = turn_idx // 2
+  phase    = "main" if turn_idx % 2 == 0 else "followup"
+
+State keys (declared in views/state.py):
+  l3_call_phase           : intro / active / closing / scoring / done
+  l3_main_questions       : list[dict] from load_main_questions(candidate_id)
+  l3_turn_idx             : 0..9
+  l3_main_transcripts     : {comp_idx: transcript}
+  l3_followups            : {comp_idx: {"bucket": str, "question": str}}
+  l3_followup_transcripts : {comp_idx: transcript}
+  l3_mic_nonce            : per-turn fresh-widget key
+  l3_consumed_fingerprint : last consumed (file_id, size) - prevents
+                            double-consumption on Streamlit reruns
 """
 
 from __future__ import annotations
@@ -18,305 +34,359 @@ import streamlit as st
 
 from assessment_logic.layer3_logic import (
     COMPETENCY_COUNT,
+    RECRUITER_OPENER,
+    RECRUITER_CLOSER,
+    acknowledge_line,
     generate_followup,
     load_main_questions,
     score_competency,
+    transition_line,
 )
 from assessment_logic.llm_client import transcribe_audio
-from assessment_logic.recording_cap import render_recording_cap
-from assessment_logic.tts import speak
+from assessment_logic.voice_call import render_silent_turn, render_voice_turn
 from database import db
 
+from . import _design as ui
 from .state import advance_stage
 
-# st.audio_input is built into Streamlit and records at 16kHz mono by default,
-# which is exactly what gpt-4o-mini-transcribe expects. The older
-# streamlit-mic-recorder component was producing 44.1/48kHz audio that Azure
-# was rejecting (returning a confusingly-shaped error referencing 'messages').
+try:
+    from streamlit_autorefresh import st_autorefresh
+except Exception:  # pragma: no cover - autorefresh is in requirements.txt
+    st_autorefresh = None
+
+
 MIC_AVAILABLE = hasattr(st, "audio_input")
 
 
+# ---------- public entry ----------
+
 def render() -> None:
-    candidate_id = st.session_state.candidate_id
+    ui.inject_global_styles()
+    ui.header(meta="Layer 3 of 3")
 
-    if not st.session_state.get("l3_started", False):
-        _intro()
-        return
+    _ensure_state_defaults()
+    phase = st.session_state.l3_call_phase
 
-    if not st.session_state.l3_main_questions:
-        st.session_state.l3_main_questions = load_main_questions(candidate_id)
-
-    comp_idx = st.session_state.l3_question_idx
-
-    if comp_idx >= COMPETENCY_COUNT:
-        _finish_layer()
-        return
-
-    comp = st.session_state.l3_main_questions[comp_idx]
-    phase = st.session_state.l3_phase  # 'main' or 'followup'
-
-    if phase == "main":
-        _render_question(
-            comp=comp,
-            phase="main",
-            question_text=comp["question"],
-        )
-    else:
-        followup = st.session_state.l3_current_followup or {}
-        _render_question(
-            comp=comp,
-            phase="followup",
-            question_text=followup.get("question", "Can you tell me more about that?"),
-        )
+    if phase == "intro":
+        _render_intro()
+    elif phase == "active":
+        _render_active()
+    elif phase == "closing":
+        _render_closing()
+    elif phase == "scoring":
+        _render_scoring()
+    else:  # "done"
+        _render_done()
 
 
-def _intro() -> None:
-    st.title("Layer 3 · AI-Led Interview")
-    st.markdown(
-        f"""
-        You'll be asked **{COMPETENCY_COUNT} interview questions**. The AI
-        interviewer will read each question out loud, then you'll record a
-        voice answer (up to 1.5 minutes). The AI will then ask one follow-up
-        based on what you said, and read that out loud too.
+# ---------- state ----------
 
-        **How it works:**
-        1. Listen as the AI reads the question.
-        2. Click **Start recording** and answer out loud.
-        3. Click **Stop** when you're done (or the 1.5-minute timer will stop you).
-        4. Review the transcript, then continue to the AI's follow-up.
+def _ensure_state_defaults() -> None:
+    """Initialise the new-style state keys on first render.
 
-        If you miss a question you can press **🔊 Replay question** at any
-        point. If transcription fails, you can type your answer instead.
+    The legacy l3_started flag is still recognised so a candidate who was
+    mid-flow on the previous version doesn't get stuck.
+    """
+    defaults = {
+        "l3_call_phase": "intro",
+        "l3_main_transcripts": {},
+        "l3_followups": {},
+        "l3_followup_transcripts": {},
+        "l3_mic_nonce": 0,
+        "l3_consumed_fingerprint": None,
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
 
-        **Tips:**
-        - Use concrete, specific examples.
-        - It's fine to pause and think before you answer.
-        - Don't rush. Clarity beats speed.
-        - Make sure your speakers or headphones are on.
+    # Bridge: if the older l3_started flag was set by a stale session, treat
+    # it as "intro" so the candidate sees the new pre-call screen.
+    if st.session_state.get("l3_started") and st.session_state.l3_call_phase == "intro":
+        st.session_state.l3_started = False
 
-        Total time: about 20 minutes.
-        """
+
+# ---------- screens ----------
+
+def _render_intro() -> None:
+    ui.eyebrow("Layer 3 · AI-led interview")
+    ui.page_title(
+        "Voice call with an AI recruiter",
+        subtitle="Five short questions, around twenty minutes. Speak openly - there are no right or wrong answers.",
     )
 
-    if not MIC_AVAILABLE:
-        st.warning(
-            "The voice recorder component isn't available. You'll be able to "
-            "type your answers instead."
+    with ui.card(eyebrow_text="Before you begin"):
+        st.markdown(
+            "- Put on headphones if you can - it stops the AI's voice from feeding into your microphone.  \n"
+            "- When the browser asks for microphone access, click Allow. You only need to grant it once.  \n"
+            "- The AI will read each question out loud, then listen. Just speak naturally - "
+            "the call will move on by itself when you stop talking.  \n"
+            "- You won't see the questions or your transcript on the screen. Treat it like a real phone interview."
         )
 
-    if st.button("Begin Layer 3", type="primary", use_container_width=True):
-        st.session_state.l3_started = True
+    if not MIC_AVAILABLE:
+        ui.info_banner(
+            "Voice recording isn't available in this browser. Please open the link in Chrome, Edge, or Safari.",
+            icon="!",
+        )
+        return
+
+    if st.button("Begin call", type="primary", use_container_width=True):
+        # Clear any leftover rows from a previous attempt so a re-take
+        # doesn't double-write into layer3_results.
+        db.clear_layer3_results(st.session_state.candidate_id)
+        # Build the question list now so we can reference it deterministically
+        # for the rest of the call.
+        if not st.session_state.l3_main_questions:
+            st.session_state.l3_main_questions = load_main_questions(
+                st.session_state.candidate_id
+            )
+        # Reset per-call state (in case the candidate is restarting).
+        st.session_state.l3_main_transcripts = {}
+        st.session_state.l3_followups = {}
+        st.session_state.l3_followup_transcripts = {}
+        st.session_state.l3_answer_scores = []
+        st.session_state.l3_closer_spoken = False
+        st.session_state.l3_call_phase = "active"
+        st.session_state.l3_started = True  # legacy flag, kept for resume_from_db
+        st.session_state.l3_turn_idx = 0
+        st.session_state.l3_mic_nonce = 0
+        st.session_state.l3_consumed_fingerprint = None
         st.session_state.l3_question_started_at = time.time()
         st.rerun()
 
 
-def _render_question(comp: dict, phase: str, question_text: str) -> None:
-    comp_idx = st.session_state.l3_question_idx
-    phase_label = "Main question" if phase == "main" else "Follow-up"
-    exchange_num = (comp_idx * 2) + (1 if phase == "main" else 2)
-    total_exchanges = COMPETENCY_COUNT * 2
+def _render_active() -> None:
+    turn_idx = st.session_state.l3_turn_idx
 
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        st.markdown(f"**Layer 3 · Question {comp_idx + 1} of {COMPETENCY_COUNT}**")
-        st.progress(
-            (exchange_num - 1) / total_exchanges,
-            text=f"Exchange {exchange_num} of {total_exchanges}",
-        )
-    with col2:
-        pass
+    # End-of-call sentinel: we've collected all ten listen turns.
+    total_turns = COMPETENCY_COUNT * 2
+    if turn_idx >= total_turns:
+        st.session_state.l3_call_phase = "closing"
+        st.session_state.l3_closing_started_at = time.time()
+        st.rerun()
+        return
 
-    st.divider()
-    heading = f"Question {comp_idx + 1}"
-    if phase == "followup":
-        heading += " - follow-up"
-    st.markdown(f"### {heading}")
-    st.info(question_text)
+    comp_idx = turn_idx // 2
+    phase = "main" if turn_idx % 2 == 0 else "followup"
+    questions = st.session_state.l3_main_questions
+    comp = questions[comp_idx]
 
-    # Speak the question. We track which (comp_idx, phase) pairs have already
-    # been auto-played so we only autoplay once when the candidate first sees
-    # the question. On reruns triggered by recording, we still render the
-    # replay button but skip autoplay (otherwise the question would replay
-    # every time the mic recorder updates).
-    spoken_key = f"l3_spoken_{comp_idx}_{phase}"
-    autoplay = not st.session_state.get(spoken_key, False)
-    speak(question_text, autoplay=autoplay)
-    if autoplay:
-        st.session_state[spoken_key] = True
+    ai_text = _compose_ai_line(comp, comp_idx, phase)
 
-    # Use phase-specific keys so re-recording one phase doesn't clobber the other
-    transcript_key = f"l3_transcript_{comp_idx}_{phase}"
-    audio_bytes_key = f"l3_audio_{comp_idx}_{phase}"
-    transcript_shown_key = f"l3_transcript_shown_{comp_idx}_{phase}"
+    # Visual header. Deliberately spare - no question text, no progress
+    # rail, no transcript echo. Looks like a phone call status line.
+    ui.eyebrow("Call in progress")
+    ui.page_title(
+        "AI Interview",
+        subtitle="The interviewer is on the line. Speak when you hear them finish.",
+    )
 
-    # --- Recording UI ---
-    if not st.session_state.get(transcript_shown_key):
-        if MIC_AVAILABLE:
-            st.markdown("**Record your answer** (up to 1.5 minutes):")
-            # Pass sample_rate=16000 if this Streamlit version supports it
-            # (added in mid-2025). Falls back gracefully on older versions -
-            # those defaulted to a higher rate which Azure may still accept.
-            audio_input_kwargs = {
-                "key": f"mic_{comp_idx}_{phase}",
-                "label_visibility": "collapsed",
-            }
-            try:
-                audio_file = st.audio_input(
-                    "Click the microphone to start, click again to stop.",
-                    sample_rate=16000,
-                    **audio_input_kwargs,
-                )
-            except TypeError:
-                # Older Streamlit without sample_rate support.
-                audio_file = st.audio_input(
-                    "Click the microphone to start, click again to stop.",
-                    **audio_input_kwargs,
-                )
+    status_html = (
+        '<div style="display:flex;align-items:center;gap:12px;margin:18px 0 8px 0;">'
+        '<span style="width:10px;height:10px;border-radius:50%;background:#FF816E;'
+        'box-shadow:0 0 0 0 rgba(255,129,110,0.7);animation:cap-pulse 1.6s infinite ease-out;"></span>'
+        '<span style="font-size:0.95rem;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8;">'
+        'Live call - microphone hands-free</span></div>'
+        "<style>@keyframes cap-pulse{0%{box-shadow:0 0 0 0 rgba(255,129,110,0.7);}"
+        "70%{box-shadow:0 0 0 14px rgba(255,129,110,0);}"
+        "100%{box-shadow:0 0 0 0 rgba(255,129,110,0);}}</style>"
+    )
+    st.markdown(status_html, unsafe_allow_html=True)
 
-            # Hard-cap the recording at 90 seconds. The cap helper renders a
-            # live countdown and clicks the recorder's stop button when the
-            # cap is reached, which triggers transcription via the same path
-            # as a manual stop.
-            render_recording_cap(max_seconds=90)
-            # st.audio_input keeps returning the same UploadedFile on every
-            # rerun, so we track which recordings we've already transcribed
-            # by (file_id, size) to avoid re-transcribing on every rerun.
-            already_done_key = f"l3_transcribed_id_{comp_idx}_{phase}"
-            if audio_file is not None:
-                # Read once. The size is stable; use it as part of the dedup key.
-                audio_bytes = audio_file.getvalue()
-                fingerprint = (audio_file.file_id, len(audio_bytes)) if hasattr(audio_file, "file_id") else (id(audio_file), len(audio_bytes))
-                if st.session_state.get(already_done_key) != fingerprint:
-                    st.session_state[already_done_key] = fingerprint
-                    st.session_state[audio_bytes_key] = audio_bytes
-                    with st.spinner("Transcribing..."):
-                        try:
-                            transcript = transcribe_audio(audio_bytes, filename="recording.wav")
-                            if not transcript:
-                                raise ValueError("Empty transcript · recording may have been silent.")
-                            st.session_state[transcript_key] = transcript
-                            st.session_state[transcript_shown_key] = True
-                            st.rerun()
-                        except Exception as e:
-                            # Surface enough detail to debug Azure config without
-                            # spilling secrets. Common failure modes:
-                            # - 401: bad/expired AZURE_OPENAI_API_KEY in secrets
-                            # - 404 DeploymentNotFound: capstone-transcribe missing
-                            # - 400 unsupported_format: API version too old or
-                            #   audio sample rate not 16kHz mono
-                            st.error(
-                                f"Transcription failed: {type(e).__name__} - {e}\n\n"
-                                "Type your answer below as a fallback. "
-                                "If this keeps happening, check the Streamlit logs "
-                                "for the underlying Azure error."
-                            )
+    # The voice turn helper: renders st.audio_input + a components.html JS
+    # block that speaks ai_text, auto-arms the recorder, and stops on
+    # silence. The returned audio_file is the UploadedFile from audio_input.
+    mic_key = f"l3_mic_{st.session_state.l3_mic_nonce}"
+    audio_file = render_voice_turn(ai_text=ai_text, mic_key=mic_key)
 
-        with st.expander("Or type your answer instead"):
-            typed = st.text_area(
-                "Type your answer",
-                key=f"typed_{comp_idx}_{phase}",
-                height=180,
+    st.markdown(
+        '<div style="margin-top:18px;font-size:0.85rem;color:#94a3b8;">'
+        "If anything goes wrong, you can press End call at any time. "
+        "Your answers so far will still be assessed."
+        "</div>",
+        unsafe_allow_html=True,
+    )
+    if st.button("End call", key="l3_end_call"):
+        st.session_state.l3_call_phase = "scoring"
+        st.rerun()
+        return
+
+    # Consume the recording (if any) exactly once. st.audio_input returns
+    # the same UploadedFile on every rerun until the widget is rekeyed, so
+    # we fingerprint by (file_id, size) and skip if we've seen this one.
+    if audio_file is None:
+        return
+
+    audio_bytes = audio_file.getvalue()
+    fingerprint = (
+        getattr(audio_file, "file_id", id(audio_file)),
+        len(audio_bytes),
+    )
+    if st.session_state.l3_consumed_fingerprint == fingerprint:
+        return
+
+    st.session_state.l3_consumed_fingerprint = fingerprint
+    _consume_turn_audio(comp_idx, phase, audio_bytes)
+
+
+def _render_closing() -> None:
+    ui.eyebrow("Call wrapping up")
+    ui.page_title(
+        "Thanks - that's the call",
+        subtitle="The interviewer is signing off. Your answers are being scored now.",
+    )
+
+    # Speak the closer once.
+    if not st.session_state.get("l3_closer_spoken"):
+        render_silent_turn(RECRUITER_CLOSER)
+        st.session_state.l3_closer_spoken = True
+
+    # Auto-advance to scoring after ~7s so the closer has time to finish.
+    if st_autorefresh is not None:
+        st_autorefresh(interval=1000, key="l3_closing_tick")
+
+    started_at = st.session_state.get("l3_closing_started_at") or time.time()
+    if time.time() - started_at > 7.0:
+        st.session_state.l3_call_phase = "scoring"
+        st.rerun()
+        return
+
+    with st.spinner("Wrapping up the call..."):
+        time.sleep(0.5)  # small visual settle; the autorefresh drives advance
+
+
+def _render_scoring() -> None:
+    ui.eyebrow("Finalising")
+    ui.page_title("Scoring your interview", subtitle="One moment - we are reviewing each competency against the rubric.")
+
+    candidate_id = st.session_state.candidate_id
+    questions = st.session_state.l3_main_questions or []
+    if not questions:
+        # Defensive: if the candidate ended the call before any questions
+        # loaded, jump straight to done with zero score.
+        st.session_state.l3_call_phase = "done"
+        st.rerun()
+        return
+
+    with st.spinner("Scoring your responses..."):
+        st.session_state.l3_answer_scores = []
+        for comp_idx, comp in enumerate(questions):
+            main_t = st.session_state.l3_main_transcripts.get(comp_idx, "")
+            fu_obj = st.session_state.l3_followups.get(comp_idx) or {}
+            fu_t = st.session_state.l3_followup_transcripts.get(comp_idx, "")
+
+            result = score_competency(
+                main_question=comp["question"],
+                main_transcript=main_t,
+                followup_question=fu_obj.get("question", ""),
+                followup_transcript=fu_t,
+                competency_name=comp["competency_name"],
+                followup_goal=comp["followup_goal"],
             )
-            if st.button("Submit typed answer", key=f"submit_typed_{comp_idx}_{phase}"):
-                if typed.strip():
-                    st.session_state[transcript_key] = typed.strip()
-                    st.session_state[transcript_shown_key] = True
-                    st.rerun()
-                else:
-                    st.warning("Please enter an answer first.")
 
-    # --- Review and continue ---
-    else:
-        transcript = st.session_state.get(transcript_key, "")
-        st.markdown("**Your transcribed answer:**")
-        st.write(f"> {transcript}")
+            main_dur = min(120.0, len(main_t.split()) / 2.5) if main_t else 0.0
+            fu_dur = min(120.0, len(fu_t.split()) / 2.5) if fu_t else 0.0
 
-        if st.button("Re-record this answer", key=f"rerecord_{comp_idx}_{phase}"):
-            st.session_state[transcript_shown_key] = False
-            st.session_state.pop(transcript_key, None)
-            st.session_state.pop(audio_bytes_key, None)
-            st.rerun()
+            db.save_layer3_result(
+                candidate_id=candidate_id,
+                competency_order=comp_idx + 1,
+                competency_id=comp["competency_id"],
+                competency_key=comp["competency_key"],
+                competency_name=comp["competency_name"],
+                main_question=comp["question"],
+                main_transcript=main_t,
+                main_audio_duration_seconds=main_dur,
+                followup_bucket=fu_obj.get("bucket"),
+                followup_question=fu_obj.get("question"),
+                followup_transcript=fu_t,
+                followup_audio_duration_seconds=fu_dur,
+                competency_score=result["score"],
+                scripted_flag=result["scripted_flag"],
+                rationale=result["rationale"],
+            )
 
-        if st.button("Continue", type="primary", key=f"continue_{comp_idx}_{phase}"):
-            _advance_after_answer(comp, phase, transcript)
+            st.session_state.l3_answer_scores.append({
+                "competency_key": comp["competency_key"],
+                "competency_id": comp["competency_id"],
+                "score": result["score"],
+                "scripted_flag": result["scripted_flag"],
+            })
+
+    st.session_state.l3_call_phase = "done"
+    st.rerun()
 
 
-def _advance_after_answer(comp: dict, phase: str, transcript: str) -> None:
-    """Branch on whether we just got a main answer or a follow-up answer."""
-    comp_idx = st.session_state.l3_question_idx
+def _render_done() -> None:
+    ui.eyebrow("Interview complete")
+    ui.page_title(
+        "Thank you",
+        subtitle="Your call has been recorded and assessed. On the next screen you'll see your full results.",
+    )
+    with ui.card(eyebrow_text="What happens next"):
+        st.markdown(
+            "Your responses are stored in your candidate record. Your full assessment "
+            "across the three layers - cognitive, simulation, and this interview - "
+            "is shown on the results screen."
+        )
+    if st.button("See my results", type="primary", use_container_width=True):
+        advance_stage("results")
+
+
+# ---------- helpers ----------
+
+def _compose_ai_line(comp: dict, comp_idx: int, phase: str) -> str:
+    """Build the exact string the AI speaks for a given turn.
+
+    Main turn: opener (Q1 only) or transition (Q2..Q5) + the verbatim
+    question from interview_questions.json.
+
+    Follow-up turn: a short acknowledgement + the LLM-generated follow-up
+    question already stashed for this competency.
+    """
+    if phase == "main":
+        if comp_idx == 0:
+            return RECRUITER_OPENER + " " + comp["question"]
+        return transition_line(comp_idx) + " " + comp["question"]
+    fu_obj = st.session_state.l3_followups.get(comp_idx) or {}
+    fu_text = fu_obj.get("question") or "Can you tell me a bit more about that?"
+    return acknowledge_line(comp_idx) + " " + fu_text
+
+
+def _consume_turn_audio(comp_idx: int, phase: str, audio_bytes: bytes) -> None:
+    """Transcribe the audio, stash it in the right slot, advance the turn."""
+    try:
+        with st.spinner(""):
+            transcript = transcribe_audio(audio_bytes, filename="turn.wav")
+    except Exception as exc:
+        # Transcription failure: stash a placeholder so scoring can still run
+        # against the rest of the call. Log via st.toast (non-intrusive).
+        transcript = ""
+        try:
+            st.toast(f"Couldn't transcribe one of your answers ({type(exc).__name__}). Continuing.", icon="!")
+        except Exception:
+            pass
+
+    transcript = (transcript or "").strip()
 
     if phase == "main":
-        # stash the main transcript, generate a follow-up, move to followup phase
-        st.session_state[f"l3_main_transcript_{comp_idx}"] = transcript
-        with st.spinner("Generating a follow-up question..."):
-            followup = generate_followup(
+        st.session_state.l3_main_transcripts[comp_idx] = transcript
+        # Generate the follow-up question now, in time for the next turn.
+        comp = st.session_state.l3_main_questions[comp_idx]
+        try:
+            fu = generate_followup(
                 main_question=comp["question"],
                 transcript=transcript,
                 competency_name=comp["competency_name"],
                 followup_goal=comp["followup_goal"],
             )
-        st.session_state.l3_current_followup = followup
-        st.session_state.l3_phase = "followup"
-        st.session_state.l3_question_started_at = time.time()
-        st.rerun()
-        return
+        except Exception:
+            fu = {"bucket": "A", "question": "Can you walk me through exactly what you personally did?"}
+        st.session_state.l3_followups[comp_idx] = fu
+    else:
+        st.session_state.l3_followup_transcripts[comp_idx] = transcript
 
-    # phase == "followup": we have everything needed to score this competency.
-    main_transcript = st.session_state.get(f"l3_main_transcript_{comp_idx}", "")
-    followup = st.session_state.get("l3_current_followup") or {}
-
-    with st.spinner("Scoring this competency..."):
-        result = score_competency(
-            main_question=comp["question"],
-            main_transcript=main_transcript,
-            followup_question=followup.get("question", ""),
-            followup_transcript=transcript,
-            competency_name=comp["competency_name"],
-            followup_goal=comp["followup_goal"],
-        )
-
-    main_dur = min(120.0, len(main_transcript.split()) / 2.5) if main_transcript else 0.0
-    fu_dur = min(120.0, len(transcript.split()) / 2.5) if transcript else 0.0
-
-    db.save_layer3_result(
-        candidate_id=st.session_state.candidate_id,
-        competency_order=comp_idx + 1,
-        competency_id=comp["competency_id"],
-        competency_key=comp["competency_key"],
-        competency_name=comp["competency_name"],
-        main_question=comp["question"],
-        main_transcript=main_transcript,
-        main_audio_duration_seconds=main_dur,
-        followup_bucket=followup.get("bucket"),
-        followup_question=followup.get("question"),
-        followup_transcript=transcript,
-        followup_audio_duration_seconds=fu_dur,
-        competency_score=result["score"],
-        scripted_flag=result["scripted_flag"],
-        rationale=result["rationale"],
-    )
-
-    st.session_state.l3_answer_scores.append({
-        "competency_key": comp["competency_key"],
-        "competency_id": comp["competency_id"],
-        "score": result["score"],
-        "scripted_flag": result["scripted_flag"],
-    })
-
-    # advance to next competency
-    st.session_state.l3_question_idx = comp_idx + 1
-    st.session_state.l3_phase = "main"
-    st.session_state.l3_current_followup = None
+    st.session_state.l3_turn_idx = st.session_state.l3_turn_idx + 1
+    st.session_state.l3_mic_nonce = st.session_state.l3_mic_nonce + 1
+    st.session_state.l3_consumed_fingerprint = None
     st.session_state.l3_question_started_at = time.time()
     st.rerun()
-
-
-def _finish_layer() -> None:
-    st.title("Layer 3 Complete")
-    st.success(
-        "You've completed all three layers. On the next screen you'll see your "
-        "full results and personalized feedback."
-    )
-
-    if st.button("See my results", type="primary", use_container_width=True):
-        advance_stage("results")

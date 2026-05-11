@@ -358,6 +358,21 @@ def count_layer3_answered(candidate_id: str) -> int:
         return row["c"]
 
 
+def clear_layer3_results(candidate_id: str) -> None:
+    """Wipe any previously-saved Layer 3 rows for a candidate.
+
+    Called at the start of a fresh interview so re-takes don't leave
+    duplicate competency rows behind (layer3_results has no UNIQUE
+    constraint on (candidate_id, competency_id), so without this a
+    re-take would silently double-write).
+    """
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM layer3_results WHERE candidate_id = ?",
+            (candidate_id,),
+        )
+
+
 # ----- Final scores -----
 
 def save_final_score(data: dict) -> None:
