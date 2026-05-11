@@ -186,17 +186,12 @@ def _render_active() -> None:
         subtitle="The interviewer is on the line. Speak when you hear them finish.",
     )
 
-    status_html = (
-        '<div style="display:flex;align-items:center;gap:12px;margin:18px 0 8px 0;">'
-        '<span style="width:10px;height:10px;border-radius:50%;background:#FF816E;'
-        'box-shadow:0 0 0 0 rgba(255,129,110,0.7);animation:cap-pulse 1.6s infinite ease-out;"></span>'
-        '<span style="font-size:0.95rem;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8;">'
-        'Live call - microphone hands-free</span></div>'
-        "<style>@keyframes cap-pulse{0%{box-shadow:0 0 0 0 rgba(255,129,110,0.7);}"
-        "70%{box-shadow:0 0 0 14px rgba(255,129,110,0);}"
-        "100%{box-shadow:0 0 0 0 rgba(255,129,110,0);}}</style>"
-    )
-    st.markdown(status_html, unsafe_allow_html=True)
+    # Reserve a slot for the status pulse. We fill it later once we know
+    # whether this render is the FIRST render of a turn (live call) or
+    # the consuming render where transcription + follow-up generation is
+    # about to run (in which case we show 'Reviewing your answer...' so
+    # the candidate sees something happening instead of silent waiting).
+    status_slot = st.empty()
 
     # The voice turn helper: renders st.audio_input + a components.html JS
     # block that speaks ai_text, auto-arms the recorder, and stops on
@@ -241,15 +236,25 @@ def _render_active() -> None:
     # Consume the recording (if any) exactly once. st.audio_input returns
     # the same UploadedFile on every rerun until the widget is rekeyed, so
     # we fingerprint by (file_id, size) and skip if we've seen this one.
-    if audio_file is None:
-        return
+    # Determine whether this render is the consuming pass: audio was
+    # delivered and we haven't processed this fingerprint yet.
+    is_consuming = False
+    audio_bytes = None
+    fingerprint = None
+    if audio_file is not None:
+        audio_bytes = audio_file.getvalue()
+        fingerprint = (
+            getattr(audio_file, "file_id", id(audio_file)),
+            len(audio_bytes),
+        )
+        if st.session_state.l3_consumed_fingerprint != fingerprint:
+            is_consuming = True
 
-    audio_bytes = audio_file.getvalue()
-    fingerprint = (
-        getattr(audio_file, "file_id", id(audio_file)),
-        len(audio_bytes),
-    )
-    if st.session_state.l3_consumed_fingerprint == fingerprint:
+    # Fill the reserved status slot at the top with a pulse that matches
+    # the actual state of the call right now.
+    _render_status_pulse(status_slot, is_consuming=is_consuming)
+
+    if not is_consuming:
         return
 
     st.session_state.l3_consumed_fingerprint = fingerprint
@@ -388,8 +393,10 @@ def _compose_ai_line(comp: dict, comp_idx: int, phase: str) -> str:
 
 def _consume_turn_audio(comp_idx: int, phase: str, audio_bytes: bytes) -> None:
     """Transcribe the audio, stash it in the right slot, advance the turn."""
+    # The visible spinner text + the amber status pulse together make
+    # the otherwise-silent 8-15s wait feel intentional.
     try:
-        with st.spinner(""):
+        with st.spinner("Reviewing your answer..."):
             transcript = transcribe_audio(audio_bytes, filename="turn.wav")
     except Exception as exc:
         # Transcription failure: stash a placeholder so scoring can still run
@@ -406,15 +413,16 @@ def _consume_turn_audio(comp_idx: int, phase: str, audio_bytes: bytes) -> None:
         st.session_state.l3_main_transcripts[comp_idx] = transcript
         # Generate the follow-up question now, in time for the next turn.
         comp = st.session_state.l3_main_questions[comp_idx]
-        try:
-            fu = generate_followup(
-                main_question=comp["question"],
-                transcript=transcript,
-                competency_name=comp["competency_name"],
-                followup_goal=comp["followup_goal"],
-            )
-        except Exception:
-            fu = {"bucket": "A", "question": "Can you walk me through exactly what you personally did?"}
+        with st.spinner("Thinking about a follow-up..."):
+            try:
+                fu = generate_followup(
+                    main_question=comp["question"],
+                    transcript=transcript,
+                    competency_name=comp["competency_name"],
+                    followup_goal=comp["followup_goal"],
+                )
+            except Exception:
+                fu = {"bucket": "A", "question": "Can you walk me through exactly what you personally did?"}
         st.session_state.l3_followups[comp_idx] = fu
     else:
         st.session_state.l3_followup_transcripts[comp_idx] = transcript
@@ -424,3 +432,37 @@ def _consume_turn_audio(comp_idx: int, phase: str, audio_bytes: bytes) -> None:
     st.session_state.l3_consumed_fingerprint = None
     st.session_state.l3_question_started_at = time.time()
     st.rerun()
+
+
+def _render_status_pulse(slot, *, is_consuming: bool) -> None:
+    """Fill the status slot with the right pulse for the current state.
+
+    is_consuming=False -> red 'Live call' pulse, candidate's turn to talk
+                          or the AI is speaking.
+    is_consuming=True  -> amber 'Reviewing your answer' pulse, system is
+                          transcribing + asking the LLM for the next line.
+                          Keeps the candidate from staring at a silent
+                          page during the 8-15s wait.
+    """
+    if is_consuming:
+        color = "#FEB100"  # amber from the design tokens
+        rgba = "rgba(254,177,0,0.7)"
+        rgba_zero = "rgba(254,177,0,0)"
+        text = "Reviewing your answer - one moment"
+    else:
+        color = "#FF816E"
+        rgba = "rgba(255,129,110,0.7)"
+        rgba_zero = "rgba(255,129,110,0)"
+        text = "Live call - microphone hands-free"
+
+    html = (
+        '<div style="display:flex;align-items:center;gap:12px;margin:18px 0 8px 0;">'
+        f'<span style="width:10px;height:10px;border-radius:50%;background:{color};'
+        f'box-shadow:0 0 0 0 {rgba};animation:cap-pulse 1.6s infinite ease-out;"></span>'
+        '<span style="font-size:0.95rem;letter-spacing:0.04em;text-transform:uppercase;color:#94a3b8;">'
+        f'{text}</span></div>'
+        f"<style>@keyframes cap-pulse{{0%{{box-shadow:0 0 0 0 {rgba};}}"
+        f"70%{{box-shadow:0 0 0 14px {rgba_zero};}}"
+        f"100%{{box-shadow:0 0 0 0 {rgba_zero};}}}}</style>"
+    )
+    slot.markdown(html, unsafe_allow_html=True)
