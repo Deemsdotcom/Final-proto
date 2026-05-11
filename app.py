@@ -177,6 +177,30 @@ def _jump_layer1(theme: str, kind: str) -> None:
 # ── Main ─────────────────────────────────────────────────────────────────
 
 
+
+
+# Two-hour TTL for candidate attempts. Throttled per-session so the
+# cleanup query doesn't fire on every Streamlit rerun (which can happen
+# on every keystroke). One minute is plenty - the user-visible behavior
+# is "your data is gone after roughly 2 hours" and a 60s slack window
+# on top of that doesn't matter.
+_PURGE_TTL_SECONDS = 2 * 60 * 60
+_PURGE_THROTTLE_SECONDS = 60
+
+
+def _maybe_purge_expired_candidates() -> None:
+    try:
+        now = time.time()
+        last = st.session_state.get("_last_purge_at", 0.0)
+        if now - last < _PURGE_THROTTLE_SECONDS:
+            return
+        st.session_state["_last_purge_at"] = now
+        db.purge_expired_candidates(ttl_seconds=_PURGE_TTL_SECONDS)
+    except Exception:
+        # A failed purge should never take the app down.
+        pass
+
+
 def main() -> None:
     st.set_page_config(
         page_title="Capgemini Invent · Consulting Assessment",
@@ -196,6 +220,28 @@ def main() -> None:
             print("=" * 60)
 
     init_session_state()
+
+    # 2-hour TTL on incomplete candidate attempts.
+    # Throttled so we hit the DB at most once per minute per session,
+    # not once per Streamlit rerun (which can fire every keystroke).
+    # Completed assessments are NOT purged, so the recruiter dashboard
+    # keeps full history.
+    _maybe_purge_expired_candidates()
+
+    # Safety net: if the candidate's session points at a candidate_id
+    # that no longer exists in the DB (their attempt was purged after
+    # 2 hours OR their teammate cleared the DB), wipe the session and
+    # send them back to landing with a friendly message instead of
+    # crashing on the next DB call.
+    if st.session_state.get("candidate_id"):
+        if db.get_candidate(st.session_state.candidate_id) is None:
+            reset_candidate_state()
+            st.info(
+                "Your session has expired. Sessions are kept for two hours - "
+                "please enter your details again to start a fresh attempt."
+            )
+            st.rerun()
+            return
 
     # ALWAYS-VISIBLE quick-nav strip. Remove this call before shipping
     # the assessment to real candidates.

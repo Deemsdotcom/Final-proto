@@ -464,6 +464,52 @@ def verify_recruiter(username: str, password: str) -> bool:
         return row["password_hash"] == _hash_password(password)
 
 
+def purge_expired_candidates(ttl_seconds: int = 7200) -> int:
+    """Hard-delete incomplete candidate attempts older than ttl_seconds.
+
+    Cascades across all the per-candidate tables: layer1_results,
+    layer2_simulation, layer3_results, final_scores, and finally the
+    candidates row itself. The candidate's email and name go with the
+    candidates row, so re-using the same email after the TTL expires
+    starts a fresh assessment from scratch.
+
+    completed_at IS NULL is the safety net: completed assessments persist
+    indefinitely for the recruiter dashboard. Only abandoned/in-progress
+    attempts get purged.
+
+    Returns the number of candidates purged. Idempotent.
+    """
+    from datetime import datetime, timedelta
+    cutoff = (datetime.utcnow() - timedelta(seconds=ttl_seconds)).isoformat()
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT candidate_id FROM candidates "
+            "WHERE started_at < ? AND completed_at IS NULL",
+            (cutoff,),
+        ).fetchall()
+        if not rows:
+            return 0
+        ids = [r["candidate_id"] for r in rows]
+        placeholders = ",".join("?" * len(ids))
+        # Wipe per-candidate rows from every table that references them.
+        # candidates row goes LAST because the FK references it.
+        for table in (
+            "layer1_results",
+            "layer2_simulation",
+            "layer3_results",
+            "final_scores",
+        ):
+            conn.execute(
+                f"DELETE FROM {table} WHERE candidate_id IN ({placeholders})",
+                ids,
+            )
+        conn.execute(
+            f"DELETE FROM candidates WHERE candidate_id IN ({placeholders})",
+            ids,
+        )
+        return len(ids)
+
+
 def clear_layer3_results(candidate_id: str) -> None:
     """Wipe any previously-saved Layer 3 rows for a candidate.
 
