@@ -43,7 +43,7 @@ from assessment_logic.layer3_logic import (
     transition_line,
 )
 from assessment_logic.llm_client import transcribe_audio
-from assessment_logic.voice_call import render_silent_turn, render_voice_turn
+from assessment_logic.voice_call import release_call_mic, render_silent_turn, render_voice_turn
 from database import db
 
 from . import _design as ui
@@ -167,6 +167,7 @@ def _render_active() -> None:
     if turn_idx >= total_turns:
         st.session_state.l3_call_phase = "closing"
         st.session_state.l3_closing_started_at = time.time()
+        release_call_mic()
         st.rerun()
         return
 
@@ -226,6 +227,7 @@ def _render_active() -> None:
     )
     if st.button("End call", key="l3_end_call"):
         st.session_state.l3_call_phase = "scoring"
+        release_call_mic()
         st.rerun()
         return
 
@@ -266,6 +268,7 @@ def _render_closing() -> None:
     started_at = st.session_state.get("l3_closing_started_at") or time.time()
     if time.time() - started_at > 7.0:
         st.session_state.l3_call_phase = "scoring"
+        release_call_mic()
         st.rerun()
         return
 

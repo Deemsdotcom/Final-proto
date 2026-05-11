@@ -11,10 +11,14 @@ Architecture notes
 * No custom Streamlit component, no WebRTC. We instrument the native
   st.audio_input widget by clicking its DOM buttons - same pattern as
   recording_cap.py.
-* The JS holds its own MediaStream via getUserMedia for VAD analysis.
-  This is separate from the stream st.audio_input opens for the actual
-  recording - they happen to point at the same physical mic but are
-  independent AudioContext graphs.
+* The MediaStream for VAD is requested ONCE per call via getUserMedia
+  and cached on window.parent so the browser only prompts for mic
+  permission on the first turn. Every subsequent turn's iframe reuses
+  the cached stream without re-prompting. The stream is explicitly
+  released at end-of-call via release_call_mic().
+* st.audio_input opens its own MediaStream when the candidate records.
+  That's independent of our VAD stream, but mic permission is already
+  granted for the origin so it doesn't re-prompt either.
 * TTS plays BEFORE the recorder is armed. We wait for utter.onend before
   clicking record, so the AI's voice doesn't bleed into the candidate's
   recording (assuming reasonable speaker/mic separation - headphones
@@ -206,10 +210,11 @@ def _render_drive_script(
 
       if (SPEAK_ONLY) {{ speakThen(null); return; }}
 
-      let audioCtx = null;
-      let analyser = null;
-      let dataArray = null;
-      let micStream = null;
+      // The candidate's mic stream is held on window.parent for the full
+      // duration of the call, so the browser only asks for microphone
+      // permission ONCE - on the first turn - and every subsequent turn
+      // reuses it silently. Each turn creates its own short-lived
+      // AudioContext / AnalyserNode on top of the cached stream.
       let belowSinceMs = null;
       let recordingStartedMs = null;
       let pollId = null;
@@ -217,9 +222,9 @@ def _render_drive_script(
 
       function stopVad() {{
         if (pollId) {{ clearInterval(pollId); pollId = null; }}
-        try {{ if (audioCtx) audioCtx.close(); }} catch (e) {{}}
-        try {{ if (micStream) micStream.getTracks().forEach(t => t.stop()); }} catch (e) {{}}
-        audioCtx = null; analyser = null; dataArray = null; micStream = null;
+        // Deliberately do NOT release window.parent.__capMicStream - it
+        // stays alive across turns. Release happens at end of call via
+        // release_call_mic() from Python.
       }}
 
       function clickStop() {{
@@ -228,7 +233,12 @@ def _render_drive_script(
         stopVad();
       }}
 
-      function startVad() {{
+      function ensureMicStream(cb) {{
+        const w = window.parent || window;
+        if (w.__capMicStream && w.__capMicStream.active) {{
+          cb(w.__capMicStream);
+          return;
+        }}
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {{
           setStatus("Mic API unavailable.");
           return;
@@ -236,21 +246,31 @@ def _render_drive_script(
         navigator.mediaDevices.getUserMedia({{
           audio: {{ echoCancellation: true, noiseSuppression: true, autoGainControl: true }}
         }}).then(function(stream) {{
-          micStream = stream;
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          const src = audioCtx.createMediaStreamSource(stream);
-          analyser = audioCtx.createAnalyser();
+          w.__capMicStream = stream;
+          cb(stream);
+        }}).catch(function(err) {{
+          setStatus("Mic permission denied - tap the recorder to record manually.");
+        }});
+      }}
+
+      function startVad() {{
+        ensureMicStream(function(stream) {{
+          // Per-turn AudioContext on top of the cached stream. The context
+          // is lightweight to create and gets GC'd when this iframe
+          // unloads at the next rerun - no need to close it manually.
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const src = ctx.createMediaStreamSource(stream);
+          const analyser = ctx.createAnalyser();
           analyser.fftSize = 512;
           analyser.smoothingTimeConstant = 0.4;
           src.connect(analyser);
-          dataArray = new Uint8Array(analyser.fftSize);
+          const dataArray = new Uint8Array(analyser.fftSize);
           recordingStartedMs = Date.now();
           belowSinceMs = null;
-          // We sample every 100ms. The RMS threshold is calibrated against
-          // typical room noise floors. 8 is a sensible floor on the 0-255
-          // time-domain scale Web Audio returns (data byte minus 128).
+          // Sample every 100ms. RMS threshold 8 on the 0-255 time-domain
+          // scale (data byte minus 128) is calibrated to typical room
+          // noise floors.
           pollId = setInterval(function() {{
-            if (!analyser) return;
             analyser.getByteTimeDomainData(dataArray);
             let sum = 0;
             for (let i = 0; i < dataArray.length; i++) {{
@@ -274,8 +294,6 @@ def _render_drive_script(
             }}
             if (HARD_CAP_MS > 0 && elapsed >= HARD_CAP_MS) {{ clickStop(); }}
           }}, 100);
-        }}).catch(function(err) {{
-          setStatus("Mic permission denied - tap the recorder to record manually.");
         }});
       }}
 
@@ -299,3 +317,28 @@ def _render_drive_script(
     </script>
     """
     components.html(component_html, height=28)
+
+
+def release_call_mic() -> None:
+    """Release the cached MediaStream held on window.parent across turns.
+
+    Call this when the call ends (End call button, transition into the
+    closing / scoring / done phases). Without this the browser keeps
+    showing 'this tab is using your microphone' even after the candidate
+    is done.
+    """
+    components.html(
+        "<script>"
+        "(function(){"
+        "try{"
+        "const w=window.parent||window;"
+        "if(w.__capMicStream){"
+        "w.__capMicStream.getTracks().forEach(function(t){try{t.stop();}catch(e){}});"
+        "w.__capMicStream=null;"
+        "}"
+        "if(\"speechSynthesis\" in window){window.speechSynthesis.cancel();}"
+        "}catch(e){}"
+        "})();"
+        "</script>",
+        height=0,
+    )
