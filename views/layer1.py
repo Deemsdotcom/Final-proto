@@ -547,8 +547,10 @@ def _render_example(theme: str) -> None:
         )
         return
 
-    # Logical: sequence image, then stem, then A-E options image,
-    # then a bullet list of options + italic explanation.
+    # Logical example: sequence image, then ui.question_stem (1.95rem,
+    # same as the real logical question), then the A-E options image,
+    # then a disabled radio with the correct letter pre-selected, then
+    # a caption with the explanation.
     if theme == "logical":
         seq_path = ex.get("sequence_image")
         if seq_path:
@@ -556,21 +558,33 @@ def _render_example(theme: str) -> None:
                 st.image(seq_path)
             except Exception:
                 pass
-        st.markdown(ex["stem"])
+        ui.question_stem(ex["stem"])
         opts_path = ex.get("options_image")
         if opts_path:
             try:
                 st.image(opts_path)
             except Exception:
                 pass
-
-    for opt in ex["options"]:
-        letter = opt.split(")", 1)[0].strip() if ")" in opt else opt.strip()
-        if letter == ex["correct"]:
-            st.markdown(f"- **{opt}** *(correct)*")
-        else:
-            st.markdown(f"- {opt}")
-    st.markdown(f"*Why: {ex['explanation']}*")
+        clean_opts = [
+            opt.split(") ", 1)[1] if ") " in opt else opt for opt in ex["options"]
+        ]
+        letters = ["A", "B", "C", "D", "E"][:len(clean_opts)]
+        correct_idx = letters.index(ex["correct"]) if ex["correct"] in letters else 0
+        st.radio(
+            "Answer",
+            options=clean_opts,
+            index=correct_idx,
+            disabled=True,
+            label_visibility="collapsed",
+            key="l1_logical_example_preview",
+        )
+        st.markdown(
+            f"<div style='margin-top:0.5rem;color:#94a3b8;font-size:0.92rem;'>"
+            f"<strong style='color:#00D5D0;'>Correct answer: "
+            f"{clean_opts[correct_idx]}</strong> &middot; {ex['explanation']}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
 
 # ============================================================
