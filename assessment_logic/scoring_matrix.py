@@ -11,9 +11,9 @@ from __future__ import annotations
 
 from typing import Optional
 
-LAYER1_WEIGHT = 0.30
+LAYER1_WEIGHT = 0.35
 LAYER2_WEIGHT = 0.35
-LAYER3_WEIGHT = 0.35
+LAYER3_WEIGHT = 0.30
 
 TOP_FIT_MIN_OVERALL = 70
 

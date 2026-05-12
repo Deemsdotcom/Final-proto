@@ -96,9 +96,9 @@ Edit `data/interview_questions.txt`. One question per line. The app samples 5 pe
 ## Scoring
 
 **Layer weights in the overall score:**
-- Layer 1: 30%
+- Layer 1: 35%
 - Layer 2: 35%
-- Layer 3: 35%
+- Layer 3: 30%
 
 **Layer 2 score (deterministic, no AI):**
 - Outcome score: 70% (final cash, reputation, projects completed, fatigue management)

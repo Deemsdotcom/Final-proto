@@ -393,8 +393,8 @@ def test_good_player_scores_higher_than_no_action(scenario):
 # ----- Scoring matrix (v7: simplified Top Fit) -----
 
 def test_overall_score_weights():
-    # 60*0.30 + 70*0.35 + 80*0.35 = 18 + 24.5 + 28 = 70.5
-    assert scoring_matrix.overall_score(60, 70, 80) == 70.5
+    # 60*0.35 + 70*0.35 + 80*0.30 = 21 + 24.5 + 24 = 69.5
+    assert scoring_matrix.overall_score(60, 70, 80) == 69.5
 
 
 def test_top_fit_v7_overall_70_or_higher_passes():
