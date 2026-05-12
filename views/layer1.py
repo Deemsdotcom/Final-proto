@@ -233,14 +233,38 @@ def render() -> None:
 # ============================================================
 
 def _layer_overview() -> None:
-    """Layer 1 overview shown once before the first theme intro."""
+    """Layer 1 overview shown once before the first theme intro.
+
+    The visual layer is our 3 theme hero cards + prep card, but every
+    obligatory sentence from the team v9 spec is rendered alongside so
+    the candidate gets the exact rule wording the team agreed on.
+    """
     ui.inject_global_styles()
     ui.header(meta=f"Candidate {st.session_state.candidate_name}")
 
     ui.eyebrow("Stage 1 of 3 · Cognitive Assessment")
     ui.page_title(
-        "Three reasoning themes, one timed sprint",
-        "Each theme has its own time block. The clock runs continuously over the theme, not per question.",
+        "Layer 1: Cognitive Assessment",
+        "Three reasoning themes, one timed sprint. Each theme has its own time block; the clock runs continuously across the theme, not per question.",
+    )
+
+    # Team v9 obligatory: the three-theme numbered list + the time-block
+    # paragraph. Written as plain markdown so the candidate sees it in
+    # the exact agreed wording.
+    st.markdown(
+        "Layer 1 has three themes you'll work through in order:\n\n"
+        "1. **Logical Reasoning**: abstract sequence puzzles. You'll see a "
+        "row of figures and pick the one that comes next in the pattern.\n"
+        "2. **Numerical Reasoning**: short charts and tables, followed by "
+        "a multiple-choice question about the data.\n"
+        "3. **Verbal Reasoning**: a short passage followed by a statement. "
+        "You decide whether the statement is **True**, **False**, or "
+        "**Cannot Say** based only on the passage.\n\n"
+        "Each theme has **10 questions** and its own **time block, not a "
+        "per-question timer**. The clock runs continuously over the whole "
+        "theme. When the theme block ends, any unanswered questions are "
+        "marked wrong and you move on to the next theme. **You cannot "
+        "revisit questions once answered.**"
     )
 
     st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
@@ -289,33 +313,34 @@ def _layer_overview() -> None:
 
     st.markdown("<div style='height:1.25rem'></div>", unsafe_allow_html=True)
 
-    # Compact prep checklist (single full-width card)
-    with ui.card("Before you begin"):
+    # Compact prep checklist (single full-width card). Three items only,
+    # matching the team v9 obligatory list.
+    with ui.card("Before you begin, please make sure you have"):
         ui.numbered_rule(
             1, "Pen and paper for working through problems.",
             severity="info",
         )
         ui.numbered_rule(
-            2, "A calculator. The numerical theme uses percentages, ratios, and multi-step figures.",
+            2, "A calculator (the numerical theme requires arithmetic on percentages, ratios, and multi-step figures).",
             severity="info",
         )
         ui.numbered_rule(
-            3, "A quiet, uninterrupted environment for the next 30 to 35 minutes.",
-            severity="info",
-        )
-        ui.numbered_rule(
-            4, "A stable internet connection. Your answers save automatically as you go.",
-            severity="info",
-        )
-        ui.numbered_rule(
-            5, "Theme time-outs mark any unanswered question wrong, and answered questions cannot be revisited.",
+            3, "A quiet, uninterrupted environment for the next ~35 minutes.",
             severity="info",
         )
 
     st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
     ui.info_banner(
-        "Pick the best answer for each question. You will not see whether you got each one right.",
+        "Pick the best answer; you will not see whether you got each question right.",
         icon="i",
+    )
+    # Team v9 obligatory tip - rendered as plain markdown so the full
+    # paragraph is preserved verbatim.
+    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
+    st.markdown(
+        "**Don't overthink it.** If you've stared for 30 seconds and "
+        "nothing clicks, pick your best guess and move on. Wrong answers "
+        "cost the same as no answer, and no answer is guaranteed wrong."
     )
     st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
 
@@ -410,12 +435,67 @@ def _theme_intro(theme: str, theme_idx: int) -> None:
         ],
     )
 
+    # Team v9 obligatory per-theme prose. Rendered as plain markdown so
+    # the team's wording is preserved verbatim, complementing our
+    # magazine spread above (which uses chips and tips for the same
+    # ideas in a different visual register).
+    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
+    if theme == "logical":
+        st.markdown(
+            "The figures change from left to right according to a pattern: "
+            "rotation, shape changes, additions, counting, or shading. "
+            "Work out the pattern, then pick the option (A-E) that comes next."
+            "\n\n### How the patterns work\n\n"
+            "Patterns can involve any combination of:\n"
+            "- **Shape changes**: squares to triangles, open to filled, etc.\n"
+            "- **Rotation**: figures turning each step\n"
+            "- **Addition or subtraction**: elements appearing or disappearing across the sequence\n"
+            "- **Counting**: number of dots, lines, or shapes increasing or decreasing\n"
+            "- **Color or shading**: alternating, inverting, or combining\n\n"
+            "### Tips before you start\n\n"
+            "- **Look at the change between adjacent figures first.** The step-by-step rule is usually easier to spot than the whole pattern at once.\n"
+            "- **Eliminate impossible options.** Even if you can't see the full pattern, you can usually rule out 2-3 options quickly."
+        )
+    elif theme == "numerical":
+        st.markdown(
+            "Each question shows a **chart or table**, followed by a "
+            "multiple-choice question about the data. You'll need to do "
+            "arithmetic on percentages, ratios, growth rates, and similar."
+            "\n\n"
+            "Use your calculator. Read the question carefully. The wrong "
+            "answers are usually plausible-looking traps based on misreading "
+            "axes, units, or which row or column to use."
+        )
+    elif theme == "verbal":
+        st.markdown(
+            "Each question shows a **short passage** followed by a "
+            "**statement**. You'll choose one of three options:\n\n"
+            "- **True**: the statement follows logically from the passage.\n"
+            "- **False**: the statement contradicts the passage.\n"
+            "- **Cannot Say**: the passage doesn't give you enough information to decide either way.\n\n"
+            "**Important:** answer based only on what the passage says. "
+            "Don't use outside knowledge, common sense, or assumptions about "
+            "what \"should\" be true. If the passage doesn't address it "
+            "directly, the answer is almost always **Cannot Say**."
+        )
+
     # Example question card (uses the team v9 EXAMPLE_QUESTIONS dict).
     st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
     with ui.card("Example question (not graded)"):
         _render_example(theme)
 
-    st.markdown("<div style='height:0.8rem'></div>", unsafe_allow_html=True)
+    # Team v9 obligatory time-budget sentence, then the
+    # auto-marked-wrong info banner.
+    st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
+    seconds_per_q = total_seconds // QUESTIONS_PER_THEME
+    st.markdown(
+        f"You have **{time_label}** total for this theme, across "
+        f"{QUESTIONS_PER_THEME} questions. That's roughly "
+        f"**{seconds_per_q} seconds per question**. Manage your time. "
+        f"The timer runs continuously; it does not reset between questions."
+    )
+
+    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
     ui.info_banner(
         f"Theme clock runs continuously for {time_label}. When it hits zero, any unanswered "
         f"questions are marked wrong and you move on.",
@@ -693,11 +773,13 @@ def _finish_layer(candidate_id: str) -> None:
     )
 
     with ui.card("Up next"):
+        # Team v9 obligatory verbatim copy for the Layer 2 teaser.
         st.markdown(
-            "**Layer 2: Firm Simulation**\n\n"
-            "You'll run a consulting firm for 8 simulated weeks. Assign consultants "
-            "to projects, manage cash and reputation, and respond to events as they "
-            "happen. 20 minutes in one continuous timer."
+            "**Next: Layer 2 (Firm Simulation)**\n\n"
+            "You'll run a consulting firm for 8 simulated weeks. Assign "
+            "consultants to projects, manage cash and reputation, and "
+            "respond to events as they happen. **20 minutes** in one "
+            "continuous timer."
         )
 
     if st.button(

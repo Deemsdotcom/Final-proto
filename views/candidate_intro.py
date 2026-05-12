@@ -14,32 +14,28 @@ from .state import advance_stage
 JOURNEY = [
     {
         "num": "1",
-        "meta": "~30 min · 30 questions",
+        "meta": "~35 min",
         "title": "Cognitive Assessment",
         "desc": (
-            "Three timed themes · logical, numerical, and verbal reasoning. "
-            "Each question has its own time limit, and you cannot revisit "
-            "an answer once it's submitted."
+            "30 timed reasoning questions across logical, numerical, "
+            "and verbal themes."
         ),
     },
     {
         "num": "2",
-        "meta": "~20 min · 8 simulated weeks",
+        "meta": "~20 min",
         "title": "Staffing Simulation",
         "desc": (
-            "Step into the shoes of a resource manager. Assign consultants "
-            "to projects under realistic constraints · a continuous "
-            "20-minute timer, with a Week 6 trade-off decision."
+            "An 8-week firm simulation where you act as a resource manager "
+            "assigning consultants to projects under real-world constraints."
         ),
     },
     {
         "num": "3",
-        "meta": "~15 min · 5 voice questions",
+        "meta": "~16 min",
         "title": "AI-Led Interview",
         "desc": (
-            "Five behavioural questions, each with a live AI follow-up. "
-            "Speak naturally; you can re-record any answer once. A typed "
-            "fallback is always available."
+            "Four voice-recorded questions with a live follow-up for each."
         ),
     },
 ]
@@ -54,8 +50,9 @@ def render() -> None:
     ui.eyebrow("Welcome · let's begin")
     ui.page_title(
         f"Welcome, {first_name}",
-        "Three short exercises across roughly 60 minutes. Take your time, "
-        "and we'll share personalised feedback at the end.",
+        "Over the next ~70 minutes, you'll complete three short exercises "
+        "that help us understand how you think, solve problems, and "
+        "communicate.",
     )
 
     # ── KPI strip · at-a-glance facts before the journey ─────────────────
@@ -64,7 +61,7 @@ def render() -> None:
     with k1:
         ui.metric("3", "Layers")
     with k2:
-        ui.metric("~60 min", "Total time")
+        ui.metric("~70 min", "Total time")
     with k3:
         ui.metric("Sign in to your current layer", "within 2 hours")
     with k4:
@@ -74,11 +71,19 @@ def render() -> None:
     ui.journey_timeline(JOURNEY)
 
     # ── Quiet reassurance + setup banner ─────────────────────────────────
+    # Team v9 obligatory copy on autosave + closing line, plus our
+    # 2-hour resume window phrasing as the practical detail.
+    ui.info_banner(
+        "Your answers are saved as you go. If you accidentally close the "
+        "tab, you can return and resume by entering the same email "
+        "(within two hours, you will pick up at the start of the last "
+        "layer you fully went through). When you finish, you will receive "
+        "personalised feedback on your performance.",
+        icon="ℹ",
+    )
     ui.info_banner(
         "Find a quiet spot, make sure your microphone works, and give "
-        "yourself uninterrupted time. If you need to close the tab, sign "
-        "back in with the same email within two hours and you will pick "
-        "up at the start of the last layer you fully went through.",
+        "yourself uninterrupted time. Good luck.",
         icon="ℹ",
     )
 

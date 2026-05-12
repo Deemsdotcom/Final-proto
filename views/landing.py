@@ -45,9 +45,10 @@ def render() -> None:
     col1, col2 = st.columns(2, gap="large")
 
     with col1:
-        with ui.card("For Candidates"):
+        with ui.card("I'm a Candidate"):
             st.markdown(
-                "<p>Begin a new assessment or resume an in-progress one.</p>",
+                "<p>Start or resume your assessment. Takes roughly "
+                "70 minutes end to end.</p>",
                 unsafe_allow_html=True,
             )
             if st.button(
