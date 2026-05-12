@@ -352,13 +352,65 @@ def _render_scoring() -> None:
         st.rerun()
         return
 
-    with st.spinner("Scoring your responses..."):
-        st.session_state.l3_answer_scores = []
+    # Short-circuit when there's NOTHING to score - someone hit End call
+    # without answering any of the questions. score_competency already
+    # short-circuits empty transcripts internally, but the loop still
+    # issues 4 db writes + 4 throttle waits. Skip the whole thing.
+    has_any_transcripts = (
+        any((v or "").strip() for v in st.session_state.l3_main_transcripts.values())
+        or any((v or "").strip() for v in st.session_state.l3_followup_transcripts.values())
+    )
+    if not has_any_transcripts:
+        # Save 0-score rows for the recruiter's L3 transcripts panel so
+        # the candidate still shows up there with empty answers.
         for comp_idx, comp in enumerate(questions):
-            main_t = st.session_state.l3_main_transcripts.get(comp_idx, "")
-            fu_obj = st.session_state.l3_followups.get(comp_idx) or {}
-            fu_t = st.session_state.l3_followup_transcripts.get(comp_idx, "")
+            db.save_layer3_result(
+                candidate_id=candidate_id,
+                competency_order=comp_idx + 1,
+                competency_id=comp["competency_id"],
+                competency_key=comp["competency_key"],
+                competency_name=comp["competency_name"],
+                main_question=comp["question"],
+                main_transcript="",
+                main_audio_duration_seconds=0.0,
+                followup_bucket=None,
+                followup_question=None,
+                followup_transcript="",
+                followup_audio_duration_seconds=0.0,
+                competency_score=0,
+                scripted_flag=False,
+                rationale="No answer provided.",
+            )
+            st.session_state.l3_answer_scores.append({
+                "competency_key": comp["competency_key"],
+                "competency_id": comp["competency_id"],
+                "score": 0,
+                "scripted_flag": False,
+            })
+        st.session_state.l3_call_phase = "done"
+        st.rerun()
+        return
 
+    total_comps = len(questions)
+    progress_slot = st.empty()
+    bar = st.progress(0.0, text="Reviewing your responses...")
+    st.session_state.l3_answer_scores = []
+
+    for comp_idx, comp in enumerate(questions):
+        progress_slot.markdown(
+            f"<div style='font-size:0.95rem;color:#94a3b8;margin:6px 0 4px 0;'>"
+            f"Scoring competency {comp_idx + 1} of {total_comps}: "
+            f"<strong style='color:#cbd5e1;'>{comp['competency_name']}</strong>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        bar.progress(comp_idx / total_comps, text=f"Scoring {comp_idx + 1} of {total_comps}...")
+
+        main_t = st.session_state.l3_main_transcripts.get(comp_idx, "")
+        fu_obj = st.session_state.l3_followups.get(comp_idx) or {}
+        fu_t = st.session_state.l3_followup_transcripts.get(comp_idx, "")
+
+        try:
             result = score_competency(
                 main_question=comp["question"],
                 main_transcript=main_t,
@@ -367,35 +419,41 @@ def _render_scoring() -> None:
                 competency_name=comp["competency_name"],
                 followup_goal=comp["followup_goal"],
             )
+        except Exception:
+            # Never let a single scoring failure stall the whole call.
+            # The candidate gets a default 'adequate' anchor score on
+            # this competency; recruiter sees the rationale.
+            result = {"score": 13, "scripted_flag": False, "rationale": "Scoring failed; default applied."}
 
-            main_dur = min(120.0, len(main_t.split()) / 2.5) if main_t else 0.0
-            fu_dur = min(120.0, len(fu_t.split()) / 2.5) if fu_t else 0.0
+        main_dur = min(120.0, len(main_t.split()) / 2.5) if main_t else 0.0
+        fu_dur = min(120.0, len(fu_t.split()) / 2.5) if fu_t else 0.0
 
-            db.save_layer3_result(
-                candidate_id=candidate_id,
-                competency_order=comp_idx + 1,
-                competency_id=comp["competency_id"],
-                competency_key=comp["competency_key"],
-                competency_name=comp["competency_name"],
-                main_question=comp["question"],
-                main_transcript=main_t,
-                main_audio_duration_seconds=main_dur,
-                followup_bucket=fu_obj.get("bucket"),
-                followup_question=fu_obj.get("question"),
-                followup_transcript=fu_t,
-                followup_audio_duration_seconds=fu_dur,
-                competency_score=result["score"],
-                scripted_flag=result["scripted_flag"],
-                rationale=result["rationale"],
-            )
+        db.save_layer3_result(
+            candidate_id=candidate_id,
+            competency_order=comp_idx + 1,
+            competency_id=comp["competency_id"],
+            competency_key=comp["competency_key"],
+            competency_name=comp["competency_name"],
+            main_question=comp["question"],
+            main_transcript=main_t,
+            main_audio_duration_seconds=main_dur,
+            followup_bucket=fu_obj.get("bucket"),
+            followup_question=fu_obj.get("question"),
+            followup_transcript=fu_t,
+            followup_audio_duration_seconds=fu_dur,
+            competency_score=result["score"],
+            scripted_flag=result["scripted_flag"],
+            rationale=result["rationale"],
+        )
 
-            st.session_state.l3_answer_scores.append({
-                "competency_key": comp["competency_key"],
-                "competency_id": comp["competency_id"],
-                "score": result["score"],
-                "scripted_flag": result["scripted_flag"],
-            })
+        st.session_state.l3_answer_scores.append({
+            "competency_key": comp["competency_key"],
+            "competency_id": comp["competency_id"],
+            "score": result["score"],
+            "scripted_flag": result["scripted_flag"],
+        })
 
+    bar.progress(1.0, text="Done")
     st.session_state.l3_call_phase = "done"
     st.rerun()
 

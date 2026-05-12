@@ -293,16 +293,22 @@ def _render_drive_script(
 
       function startVad() {{
         ensureMicStream(function(stream) {{
-          // Per-turn AudioContext on top of the cached stream. The context
-          // is lightweight to create and gets GC'd when this iframe
-          // unloads at the next rerun - no need to close it manually.
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          // Build the AudioContext via window.parent's constructor so it
+          // inherits the user-activation state from the original Begin
+          // call click. Without this, the second (and later) turns'
+          // contexts start 'suspended' and analyser data is all-zero,
+          // so VAD never detects speech and the silence timer never
+          // resets - exactly the 'didn't restart the 4s window' bug.
+          const ParentAC = (window.parent && (window.parent.AudioContext || window.parent.webkitAudioContext)) || window.AudioContext || window.webkitAudioContext;
+          const ctx = new ParentAC();
           const src = ctx.createMediaStreamSource(stream);
           const analyser = ctx.createAnalyser();
           analyser.fftSize = 512;
           analyser.smoothingTimeConstant = 0.4;
           src.connect(analyser);
           const dataArray = new Uint8Array(analyser.fftSize);
+          // Explicit resume in case the context started suspended.
+          try {{ if (ctx.state === 'suspended') ctx.resume(); }} catch (e) {{}}
           recordingStartedMs = Date.now();
           belowSinceMs = null;
           // Sample every 100ms. RMS threshold 8 on the 0-255 time-domain

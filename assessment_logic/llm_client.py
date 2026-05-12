@@ -169,6 +169,10 @@ def chat_complete(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=temperature,
                 max_tokens=max_tokens,
+                # Hard request timeout so a single hung call can't stall
+                # the scoring step forever. 25s is generous - typical
+                # responses come back in 3-8s.
+                timeout=25.0,
             )
             elapsed = time.time() - t0
             content = resp.choices[0].message.content or ""
