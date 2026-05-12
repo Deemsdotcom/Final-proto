@@ -466,38 +466,70 @@ def _theme_intro(theme: str, theme_idx: int) -> None:
 
 
 def _render_example(theme: str) -> None:
-    """Render the example question card body. Called inside ui.card()."""
+    """Render the example question card body. Called inside ui.card().
+
+    Numerical and verbal examples render in the same visual register as
+    the real question screens (cap-q-stem at 1.55rem, disabled radio
+    cards with the correct option pre-selected, caption with the
+    explanation). Logical keeps its image-based layout.
+    """
     ex = EXAMPLE_QUESTIONS.get(theme)
     if not ex:
         return
 
-    # Verbal example: render in the same visual register as a real
-    # verbal question screen. Big bold stem via ui.question_stem,
-    # answer choices as a disabled radio with the correct one
-    # pre-selected, then a small caption confirming the correct
-    # answer + the explanation.
+    # Numerical example: chart image, then 1.55rem stem, then disabled
+    # radio cards with the correct option pre-selected, then a caption.
+    if theme == "numerical":
+        chart_path = ex.get("chart_image")
+        if chart_path:
+            try:
+                st.image(chart_path)
+            except Exception:
+                pass
+        st.markdown(
+            '<div class="cap-q-stem" style="font-size:1.55rem;margin:0.5rem 0 1.5rem 0;">'
+            + str(ex["stem"]).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            + '</div>',
+            unsafe_allow_html=True,
+        )
+        clean_opts = [
+            opt.split(") ", 1)[1] if ") " in opt else opt for opt in ex["options"]
+        ]
+        letters = ["A", "B", "C", "D", "E"][:len(clean_opts)]
+        correct_idx = letters.index(ex["correct"]) if ex["correct"] in letters else 0
+        st.radio(
+            "Answer",
+            options=clean_opts,
+            index=correct_idx,
+            disabled=True,
+            label_visibility="collapsed",
+            key="l1_numerical_example_preview",
+        )
+        st.markdown(
+            f"<div style='margin-top:0.5rem;color:#94a3b8;font-size:0.92rem;'>"
+            f"<strong style='color:#00D5D0;'>Correct answer: "
+            f"{clean_opts[correct_idx]}</strong> &middot; {ex['explanation']}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    # Verbal example: 1.55rem stem with passage / statement on separate
+    # paragraphs (mirrors real question), then disabled radio cards.
     if theme == "verbal":
-        # Split passage and statement so they display on separate
-        # paragraphs (mirrors how the real question renders).
         parts = [p.strip() for p in str(ex["stem"]).split("\n\n") if p.strip()]
         for part in parts:
             st.markdown(
-                '<div class="cap-q-stem" style="font-size:1.2rem;margin:0.4rem 0;">'
+                '<div class="cap-q-stem" style="font-size:1.55rem;margin:0.4rem 0 0.8rem 0;">'
                 + part.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 + '</div>',
                 unsafe_allow_html=True,
             )
-
-        # Strip the 'A) ' / 'B) ' prefix so the radio shows clean labels.
-        clean_opts = []
-        for opt in ex["options"]:
-            if ") " in opt:
-                clean_opts.append(opt.split(") ", 1)[1])
-            else:
-                clean_opts.append(opt)
+        clean_opts = [
+            opt.split(") ", 1)[1] if ") " in opt else opt for opt in ex["options"]
+        ]
         letters = ["A", "B", "C", "D", "E"][:len(clean_opts)]
         correct_idx = letters.index(ex["correct"]) if ex["correct"] in letters else 0
-
         st.radio(
             "Answer",
             options=clean_opts,
@@ -509,13 +541,14 @@ def _render_example(theme: str) -> None:
         st.markdown(
             f"<div style='margin-top:0.5rem;color:#94a3b8;font-size:0.92rem;'>"
             f"<strong style='color:#00D5D0;'>Correct answer: "
-            f"{clean_opts[correct_idx]}</strong> &mdash; {ex['explanation']}"
+            f"{clean_opts[correct_idx]}</strong> &middot; {ex['explanation']}"
             f"</div>",
             unsafe_allow_html=True,
         )
         return
 
-    # Logical: sequence image, then stem, then A-E options image.
+    # Logical: sequence image, then stem, then A-E options image,
+    # then a bullet list of options + italic explanation.
     if theme == "logical":
         seq_path = ex.get("sequence_image")
         if seq_path:
@@ -530,17 +563,7 @@ def _render_example(theme: str) -> None:
                 st.image(opts_path)
             except Exception:
                 pass
-    # Numerical: chart image first, then stem.
-    elif theme == "numerical":
-        chart_path = ex.get("chart_image")
-        if chart_path:
-            try:
-                st.image(chart_path)
-            except Exception:
-                pass
-        st.markdown(ex["stem"])
 
-    # Logical / numerical: keep the original markdown-bullet option list.
     for opt in ex["options"]:
         letter = opt.split(")", 1)[0].strip() if ")" in opt else opt.strip()
         if letter == ex["correct"]:
