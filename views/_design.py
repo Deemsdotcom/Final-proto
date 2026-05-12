@@ -1272,6 +1272,29 @@ def numbered_rule(num: int, text: str, severity: str = "info") -> None:
     )
 
 
+def completion_badge() -> None:
+    """Centred 'all done' checkmark in a teal circle.
+
+    Used at the top of each layer-complete screen so the candidate gets
+    a moment of visual celebration before the next-step copy. No text -
+    pure visual flourish.
+    """
+    st.markdown(
+        '<div style="display:flex;justify-content:center;'
+        'margin:1.5rem 0 0.75rem 0;">'
+        '<div style="width:68px;height:68px;border-radius:50%;'
+        'background:rgba(0,213,208,0.14);'
+        'border:2px solid #00D5D0;display:flex;align-items:center;'
+        'justify-content:center;box-shadow:0 0 0 6px rgba(0,213,208,0.07);">'
+        '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" '
+        'stroke="#00D5D0" stroke-width="2.5" stroke-linecap="round" '
+        'stroke-linejoin="round">'
+        '<polyline points="20 6 9 17 4 12"/>'
+        '</svg></div></div>',
+        unsafe_allow_html=True,
+    )
+
+
 def info_banner(text: str, icon: str = "ℹ", tone: str = "info") -> None:
     """Left-accented banner for contextual notes.
 

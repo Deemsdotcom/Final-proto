@@ -668,14 +668,23 @@ def _finalize_and_advance(scenario: dict, state: dict, elapsed: int) -> None:
         time_taken_seconds=elapsed,
     )
 
+    # Inject the design system styles + header here too because
+    # _finalize_and_advance is a different code path from _render_week
+    # (no per-week chrome runs), so the global stylesheet needs to be
+    # re-attached for the completion screen.
+    ui.inject_global_styles()
+    ui.header(meta=f"Candidate {st.session_state.candidate_name}")
+
+    ui.completion_badge()
     ui.eyebrow("Stage 2 of 3 complete")
     ui.page_title(
         "Layer 2 Complete",
         "You've finished the firm simulation.",
     )
 
-    with ui.card("Next: Layer 3 (AI-Led Interview)"):
+    with ui.card("Up next"):
         st.markdown(
+            "**Next: Layer 3 (AI-Led Interview)**\n\n"
             "Four questions, each with a follow-up. Each answer is voice-recorded, "
             "transcribed, and scored on clarity, structure, relevance, and depth."
         )

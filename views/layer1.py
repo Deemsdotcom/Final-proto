@@ -769,7 +769,7 @@ def _finish_layer(candidate_id: str) -> None:
     ui.inject_global_styles()
     ui.header(meta=f"Candidate {st.session_state.candidate_name}")
 
-    # Team v9 verbatim title.
+    ui.completion_badge()
     ui.eyebrow("Stage 1 of 3 complete")
     ui.page_title(
         "Layer 1 Complete",
