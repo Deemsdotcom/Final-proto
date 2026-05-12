@@ -366,19 +366,33 @@ def _render_deep_dive(candidate_id: str) -> None:
 
     # Layer 3 detail
     with st.expander("Layer 3: Interview transcripts"):
+        l3_rows = db.get_layer3_results(candidate_id)
         # Tech-issue escape: if the candidate hit "I'm having technical
-        # issues" during the call, show their reason verbatim instead of
-        # transcripts. layer3_skipped + layer3_skip_reason are stored in
-        # final_scores - the scores dict here was loaded from there.
+        # issues" during the call, show their reason verbatim at the top.
+        # Any answers they gave BEFORE pressing the escape are scored
+        # normally and rendered below this banner.
         if scores.get("layer3_skipped"):
             reason = scores.get("layer3_skip_reason") or "(no reason provided)"
+            partial = any(
+                (r.get("main_transcript") or "").strip()
+                or (r.get("followup_transcript") or "").strip()
+                for r in l3_rows
+            )
+            if partial:
+                trailing = (
+                    "Partial transcripts were captured before the candidate "
+                    "flagged the issue - they're shown below and were scored "
+                    "as normal (unanswered competencies count as 0)."
+                )
+            else:
+                trailing = (
+                    "No interview transcripts were captured. The candidate's "
+                    "Layer 1 and Layer 2 results are still valid."
+                )
             st.error(
                 "**Layer 3 skipped by candidate (technical issues)**\n\n"
-                f"Candidate's note:\n\n> {reason}\n\n"
-                "No interview transcripts were captured. The candidate's "
-                "Layer 1 and Layer 2 results are still valid."
+                f"Candidate's note:\n\n> {reason}\n\n" + trailing
             )
-        l3_rows = db.get_layer3_results(candidate_id)
         if not l3_rows and not scores.get("layer3_skipped"):
             st.write("No Layer 3 data.")
         bucket_names = {

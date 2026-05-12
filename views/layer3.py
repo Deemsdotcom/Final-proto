@@ -348,16 +348,13 @@ def _render_scoring() -> None:
     candidate_id = st.session_state.candidate_id
     questions = st.session_state.l3_main_questions or []
 
-    # Technical-issue skip path: candidate pressed "I'm having technical
-    # issues" mid-call. No transcripts to score, and we don't want to
-    # waste LLM calls. Jump straight to done; the reason is forwarded
-    # into final_scores from candidate_results._save_base_scores_fast
-    # via the l3_skip_reason session_state key.
-    if st.session_state.get("l3_skip_reason"):
-        st.session_state.l3_answer_scores = []
-        st.session_state.l3_call_phase = "done"
-        st.rerun()
-        return
+    # If the candidate pressed "I'm having technical issues" mid-call,
+    # we DO still score whatever transcripts were captured before the
+    # skip. The l3_skip_reason flag is forwarded into final_scores via
+    # candidate_results._save_base_scores_fast separately - it shows up
+    # in the recruiter dashboard as a top-level banner. Partial answers
+    # get scored as usual (score_competency short-circuits empty
+    # transcripts to score 0 internally, no LLM call).
 
     if not questions:
         # Defensive: if the candidate ended the call before any questions

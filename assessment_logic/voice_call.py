@@ -48,7 +48,7 @@ def render_voice_turn(
     *,
     speak: bool = True,
     turn_id: str = "",
-    silence_ms: int = 4000,
+    silence_ms: int = 6000,
     hard_cap_seconds: int = 90,
     voice_hint: str = "en",
 ) -> Optional[object]:
