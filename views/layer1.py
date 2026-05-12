@@ -89,7 +89,7 @@ EXAMPLE_QUESTIONS = {
         "stem": (
             "Passage: The decision must be notified in writing within "
             "fourteen days of the hearing.\n\n"
-            "**Statement:** A notification given orally would not satisfy the "
+            "Statement: A notification given orally would not satisfy the "
             "requirement."
         ),
         "options": ["A) True", "B) False", "C) Cannot Say"],
@@ -471,6 +471,50 @@ def _render_example(theme: str) -> None:
     if not ex:
         return
 
+    # Verbal example: render in the same visual register as a real
+    # verbal question screen. Big bold stem via ui.question_stem,
+    # answer choices as a disabled radio with the correct one
+    # pre-selected, then a small caption confirming the correct
+    # answer + the explanation.
+    if theme == "verbal":
+        # Split passage and statement so they display on separate
+        # paragraphs (mirrors how the real question renders).
+        parts = [p.strip() for p in str(ex["stem"]).split("\n\n") if p.strip()]
+        for part in parts:
+            st.markdown(
+                '<div class="cap-q-stem" style="font-size:1.2rem;margin:0.4rem 0;">'
+                + part.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                + '</div>',
+                unsafe_allow_html=True,
+            )
+
+        # Strip the 'A) ' / 'B) ' prefix so the radio shows clean labels.
+        clean_opts = []
+        for opt in ex["options"]:
+            if ") " in opt:
+                clean_opts.append(opt.split(") ", 1)[1])
+            else:
+                clean_opts.append(opt)
+        letters = ["A", "B", "C", "D", "E"][:len(clean_opts)]
+        correct_idx = letters.index(ex["correct"]) if ex["correct"] in letters else 0
+
+        st.radio(
+            "Answer",
+            options=clean_opts,
+            index=correct_idx,
+            disabled=True,
+            label_visibility="collapsed",
+            key="l1_verbal_example_preview",
+        )
+        st.markdown(
+            f"<div style='margin-top:0.5rem;color:#94a3b8;font-size:0.92rem;'>"
+            f"<strong style='color:#00D5D0;'>Correct answer: "
+            f"{clean_opts[correct_idx]}</strong> &mdash; {ex['explanation']}"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
     # Logical: sequence image, then stem, then A-E options image.
     if theme == "logical":
         seq_path = ex.get("sequence_image")
@@ -495,10 +539,8 @@ def _render_example(theme: str) -> None:
             except Exception:
                 pass
         st.markdown(ex["stem"])
-    # Verbal: passage + statement, no image.
-    else:
-        st.markdown(ex["stem"])
 
+    # Logical / numerical: keep the original markdown-bullet option list.
     for opt in ex["options"]:
         letter = opt.split(")", 1)[0].strip() if ")" in opt else opt.strip()
         if letter == ex["correct"]:
