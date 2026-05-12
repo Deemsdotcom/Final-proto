@@ -217,20 +217,23 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
     )
 
     # ── Firm KPI strip ────────────────────────────────────────────────
+    # 4-up grid in a single st.markdown call. Using a CSS grid here
+    # rather than st.columns(4) because Streamlit's column layout was
+    # wrapping the 4th tile onto a new row at certain viewport widths.
     completed = sum(1 for ps in state["projects"].values() if ps["status"] == "completed")
     failed = sum(
         1 for ps in state["projects"].values()
         if ps["status"] in ("cancelled", "quality_failure", "missed_deadline")
     )
-    k1, k2, k3, k4 = st.columns(4, gap="small")
-    with k1:
-        ui.metric(f"\u20ac{state['cash']:,.0f}", "Cash")
-    with k2:
-        ui.metric(f"{state['reputation']:.0f}/100", "Reputation")
-    with k3:
-        ui.metric(str(completed), "Projects done")
-    with k4:
-        ui.metric(str(failed), "Projects failed")
+    st.markdown(
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.6rem;margin:0.2rem 0 0.4rem 0;">'
+        + f'<div class="cap-metric"><span class="val">\u20ac{state["cash"]:,.0f}</span><span class="lbl">Cash</span></div>'
+        + f'<div class="cap-metric"><span class="val">{state["reputation"]:.0f}/100</span><span class="lbl">Reputation</span></div>'
+        + f'<div class="cap-metric"><span class="val">{completed}</span><span class="lbl">Projects done</span></div>'
+        + f'<div class="cap-metric"><span class="val">{failed}</span><span class="lbl">Projects failed</span></div>'
+        + '</div>',
+        unsafe_allow_html=True,
+    )
 
     # ── Events firing this week ───────────────────────────────────────
     events = events_for_week(scenario, week)
