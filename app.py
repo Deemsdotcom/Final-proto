@@ -209,15 +209,26 @@ def main() -> None:
         initial_sidebar_state="collapsed",
     )
 
-    # Initialize DB once per process
+    # Initialize DB once per process. Wrapped in try/except so a freshly
+    # seeded container (Streamlit Cloud recycles containers after sleep,
+    # which gives us a fresh filesystem and a brand-new DB) can never
+    # take the whole app down on its first request. Inside the success
+    # path we use DEFAULT_RECRUITER_PASSWORD directly because that's the
+    # constant the merged team-v9 db.py exposes; the old wrapper function
+    # get_recruiter_password() was removed in the merge.
     if "db_initialized" not in st.session_state:
-        freshly_seeded = db.init_db()
-        st.session_state.db_initialized = True
-        if freshly_seeded:
-            print("=" * 60)
-            print("First-time setup complete.")
-            print(f"Default recruiter login: {db.DEFAULT_RECRUITER_USERNAME} / {db.get_recruiter_password()}")
-            print("=" * 60)
+        try:
+            freshly_seeded = db.init_db()
+            st.session_state.db_initialized = True
+            if freshly_seeded:
+                print("=" * 60)
+                print("First-time setup complete.")
+                pw = getattr(db, "DEFAULT_RECRUITER_PASSWORD", "(see secrets)")
+                print(f"Default recruiter login: {db.DEFAULT_RECRUITER_USERNAME} / {pw}")
+                print("=" * 60)
+        except Exception as exc:
+            st.session_state.db_initialized = True
+            print(f"[init_db] non-fatal: {type(exc).__name__}: {exc}")
 
     init_session_state()
 
