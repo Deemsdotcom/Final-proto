@@ -477,7 +477,7 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
 def _render_decision(decision: dict, scenario: dict) -> tuple[str, str] | None:
     """Render a one-off decision modal. Returns (decision_id, choice_id) or None."""
     with ui.card("\U0001F4CB Decision required"):
-        st.warning(decision["description"])
+        ui.info_banner(decision["description"], icon="\u26A0\uFE0F", tone="warn")
 
         option_labels = [f"**{opt['id'].replace('_', ' ').title()}**, {opt['label']}"
                          for opt in decision["options"]]
@@ -488,7 +488,10 @@ def _render_decision(decision: dict, scenario: dict) -> tuple[str, str] | None:
             index=None,
         )
         if choice_display is None:
-            st.info("You must make this decision before continuing the week.")
+            ui.info_banner(
+                "You must make this decision before continuing the week.",
+                icon="\u2139",
+            )
             return None
         chosen = decision["options"][option_labels.index(choice_display)]
     # find the decision_id by looking it up in scenario['decisions']
@@ -506,7 +509,7 @@ def _render_tradeoff(scenario: dict) -> str | None:
     """Render the Week 6 trade-off modal. Returns the choice id or None if not chosen yet."""
     tradeoff = scenario["tradeoff"]
     with ui.card("\u26A0\uFE0F Trade-off decision"):
-        st.error(tradeoff["description"])
+        ui.info_banner(tradeoff["description"], icon="\u26A0\uFE0F", tone="crit")
 
         option_labels = [f"**{opt['id']}**, {opt['label']}" for opt in tradeoff["options"]]
         choice_display = st.radio(
@@ -516,7 +519,10 @@ def _render_tradeoff(scenario: dict) -> str | None:
             index=None,
         )
         if choice_display is None:
-            st.info("You must make this decision before continuing the week.")
+            ui.info_banner(
+                "You must make this decision before continuing the week.",
+                icon="\u2139",
+            )
             return None
         return tradeoff["options"][option_labels.index(choice_display)]["id"]
 

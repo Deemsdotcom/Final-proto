@@ -381,6 +381,19 @@ _GLOBAL_CSS = f"""
 }}
 .cap-banner .icon {{ color: {BLUE_CYAN}; flex-shrink: 0; }}
 
+.cap-banner.cap-banner-warn {{
+    background: rgba(254,177,0,0.10);
+    border: 1px solid rgba(254,177,0,0.35);
+    border-left: 3px solid {AMBER};
+}}
+.cap-banner.cap-banner-warn .icon {{ color: {AMBER}; }}
+.cap-banner.cap-banner-crit {{
+    background: rgba(255,129,110,0.10);
+    border: 1px solid rgba(255,129,110,0.4);
+    border-left: 3px solid {RED};
+}}
+.cap-banner.cap-banner-crit .icon {{ color: {RED}; }}
+
 /* ── Primary buttons ────────────────────────────────────────────────────── */
 .stApp .stButton > button[kind="primary"],
 .stApp .stFormSubmitButton > button[kind="primary"] {{
@@ -1216,11 +1229,23 @@ def numbered_rule(num: int, text: str, severity: str = "info") -> None:
     )
 
 
-def info_banner(text: str, icon: str = "ℹ") -> None:
-    """Left-accented cyan banner for contextual notes above CTAs."""
+def info_banner(text: str, icon: str = "ℹ", tone: str = "info") -> None:
+    """Left-accented banner for contextual notes.
+
+    tone:
+      'info' (default) - cyan accent, for neutral hints / next-step prompts
+      'warn'           - amber accent, for cautions like a decision the
+                         candidate must make before continuing
+      'crit'           - red accent, for harder warnings (trade-off modal)
+    """
+    tone_class = {
+        "info": "",
+        "warn": " cap-banner-warn",
+        "crit": " cap-banner-crit",
+    }.get(tone, "")
     st.markdown(
         f"""
-        <div class="cap-banner">
+        <div class="cap-banner{tone_class}">
             <span class="icon">{icon}</span>
             <span>{_esc(text)}</span>
         </div>
