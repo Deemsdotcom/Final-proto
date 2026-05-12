@@ -124,20 +124,40 @@ def _render_intro() -> None:
     # otherwise we'd be waiting on the voices-loaded fallback timer.
     prewarm_tts()
 
-    # 'Before you begin' rendered as a cap-feat block (cyan top stripe +
-    # cyan eyebrow + cap-feat-tips numbered list). Matches the visual
-    # language of the Layer 2 intro and the layer-complete screens.
+    # Three thematic cap-feat blocks instead of one dense list, matching
+    # the multi-block layout of the Layer 2 intro. Tip wording is
+    # preserved verbatim; the section eyebrows group related advice.
     st.markdown(
         '''
 <div class="cap-feat" style="margin-bottom:1rem;">
-  <div class="cap-feat-eyebrow">Before you begin</div>
+  <div class="cap-feat-eyebrow">How the call works</div>
   <ul class="cap-feat-tips">
-    <li>After the AI finishes asking, just start speaking. When you stay silent for six seconds in a row, your answer is automatically submitted and the call moves on.</li>
-    <li>Rarely, the microphone may miss a word. If that happens, just say it again a little louder and watch the silence counter - if it restarts, the call is still listening.</li>
-    <li>When the browser asks for microphone access, click Allow. You only need to grant it once.</li>
     <li>The AI will read each question out loud, then listen. Just speak naturally - the call will move on by itself when you stop talking.</li>
+    <li>After the AI finishes asking, just start speaking. When you stay silent for six seconds in a row, your answer is automatically submitted and the call moves on.</li>
     <li>You won\'t see the questions or your transcript on the screen. Treat it like a real interview.</li>
-    <li>If you hit technical issues, press the "I\'m having technical issues" button. Write a short note about what happened - your note is sent straight to the recruitment team.</li>
+  </ul>
+</div>
+''',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '''
+<div class="cap-feat" style="margin-bottom:1rem;">
+  <div class="cap-feat-eyebrow">Microphone</div>
+  <ul class="cap-feat-tips">
+    <li>When the browser asks for microphone access, click Allow. You only need to grant it once.</li>
+    <li>Rarely, the microphone may miss a word. If that happens, just say it again a little louder and watch the silence counter - if it restarts, the call is still listening.</li>
+  </ul>
+</div>
+''',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '''
+<div class="cap-feat" style="margin-bottom:1rem;">
+  <div class="cap-feat-eyebrow">If you have technical issues</div>
+  <ul class="cap-feat-tips">
+    <li>Press the "I\'m having technical issues" button. Write a short note about what happened - your note is sent straight to the recruitment team.</li>
     <li>If the issue happens partway through - say you\'d already answered a few questions - your earlier answers are still scored. Only the questions you didn\'t reach won\'t be graded.</li>
   </ul>
 </div>
