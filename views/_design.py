@@ -208,6 +208,32 @@ _GLOBAL_CSS = f"""
 }}
 
 
+/* ── Layer 2 staffing row (project label above each multiselect) ───────── */
+.l2-staff-row {{
+    margin: 0.9rem 0 0 0;
+}}
+.l2-staff-row:first-of-type {{ margin-top: 0.4rem; }}
+.l2-staff-label {{
+    background: {NAVY_CARD_2};
+    border: 1px solid {NAVY_BORDER};
+    border-left: 3px solid {BLUE_CYAN};
+    border-radius: 6px 6px 0 0;
+    padding: 0.55rem 0.95rem 0.55rem 1rem;
+    color: {TEXT_PRIMARY};
+    font-size: 0.98rem;
+    line-height: 1.3;
+    margin-bottom: -1px;
+}}
+.l2-staff-label strong {{
+    color: {BLUE_CYAN};
+    font-weight: 700;
+}}
+.l2-staff-label .l2-staff-id {{
+    color: {TEXT_SECONDARY};
+    margin-left: 0.25rem;
+    font-weight: 500;
+}}
+
 /* ── Layer 2 mini cards (consultants + projects) ───────────────────────── */
 .l2-mini {{
     background: {NAVY_CARD_2};

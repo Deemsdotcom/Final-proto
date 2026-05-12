@@ -423,12 +423,23 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
         for project in visible_projects:
             pid = project["id"]
             current = [cid for cid in assignments.get(pid, []) if cid in consultant_label]
+            # Styled label row above the multiselect. The same label text
+            # is still passed into st.multiselect for accessibility, just
+            # collapsed visually so we don't show it twice.
+            st.markdown(
+                f'<div class="l2-staff-row"><div class="l2-staff-label">'
+                f'<strong>{project["name"]}</strong>'
+                f'<span class="l2-staff-id">({pid})</span>'
+                f'</div></div>',
+                unsafe_allow_html=True,
+            )
             chosen = st.multiselect(
                 f"**{project['name']}** ({pid})",
                 options=list(consultant_label.keys()),
                 default=current,
                 format_func=lambda cid: consultant_label[cid],
                 key=f"l2_assign_w{week}_{pid}",
+                label_visibility="collapsed",
             )
             new_assignments[pid] = chosen
         st.session_state[assignments_key] = new_assignments
