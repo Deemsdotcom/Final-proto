@@ -207,11 +207,9 @@ def _render_consultant_card(c, fatigue, sick, departed) -> None:
     a thin fatigue progress bar at the bottom (colour mirrors the
     existing emoji indicator).
     """
-    sen_cls = {
-        "Senior":     "l2-mini-senior",
-        "Manager":    "l2-mini-manager",
-    }.get(c["seniority"], "l2-mini-consultant")
-
+    # Left border kept uniform (default cyan) - the user doesn't want
+    # the border colour to leak seniority info, since seniority is
+    # already shown in plain text inside the card.
     tag = ""
     if departed:
         tag = " \u274C *no longer with the firm*"
@@ -228,7 +226,7 @@ def _render_consultant_card(c, fatigue, sick, departed) -> None:
     fatigue_line = f"Fatigue: {fatigue_emoji} {fatigue}/100"
 
     st.markdown(
-        f'<div class="l2-mini {sen_cls}">'
+        f'<div class="l2-mini">'
         f'<div class="l2-mini-title">{title}</div>'
         f'<div class="l2-mini-line">{skills_line}</div>'
         f'<div class="l2-mini-line">{fatigue_line}</div>'
@@ -248,10 +246,9 @@ def _render_project_card(p, ps, total: int) -> None:
     thin progress bar at the bottom (only when the project is active),
     showing weeks staffed vs total duration.
     """
-    tier = p.get("priority_tier", "C")
-    tier_cls = {"A": "l2-mini-tier-a", "B": "l2-mini-tier-b"}.get(tier, "l2-mini-tier-c")
-
-    tier_emoji = {"A": "\U0001F534", "B": "\U0001F7E1", "C": "\u26AA"}.get(tier, "\u26AA")
+    # Tier hint removed per user request: no coloured priority bubble
+    # in the title and no tier-coloured border. The priority_tier is
+    # still used inside the scoring logic, just not surfaced visually.
     urgent_tag = " \U0001F6A8 URGENT" if p.get("urgent") else ""
     progress = ps["weeks_staffed_correctly"]
     duration = p["duration_weeks"]
@@ -265,7 +262,7 @@ def _render_project_card(p, ps, total: int) -> None:
         status_str = " \u00B7 \U0001F195 Not started"
 
     title = _md_inline_to_html(
-        f"{tier_emoji} <strong>{p['name']}</strong> ({p['id']}){urgent_tag}{status_str}"
+        f"<strong>{p['name']}</strong> ({p['id']}){urgent_tag}{status_str}"
     )
     skills_line = (
         f"Skills: {', '.join(p.get('required_skills', []))} \u00B7 "
@@ -286,7 +283,7 @@ def _render_project_card(p, ps, total: int) -> None:
         )
 
     st.markdown(
-        f'<div class="l2-mini {tier_cls}">'
+        f'<div class="l2-mini">'
         f'<div class="l2-mini-title">{title}</div>'
         f'<div class="l2-mini-line">{skills_line}</div>'
         f'<div class="l2-mini-line">{nums_line}</div>'
