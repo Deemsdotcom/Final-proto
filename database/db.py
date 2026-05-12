@@ -403,8 +403,17 @@ def count_layer3_typed_fallback(candidate_id: str) -> int:
 # ----- Final scores -----
 
 def save_final_score(data: dict) -> None:
-    """data must contain every column in final_scores."""
-    cols = [
+    """Write a row into final_scores. Defensive against schema drift.
+
+    Only columns that actually exist in final_scores right now are
+    included in the INSERT. If a column add migration failed on this
+    DB (the in-place ALTER TABLE is wrapped in try/except so the app
+    boots even if one ALTER fails), the corresponding key in `data`
+    is just dropped silently. ai_flag_* and layer3_skipped default
+    to 0 when the caller didn't supply them; everything else defaults
+    to None.
+    """
+    desired_cols = [
         "candidate_id", "layer1_score", "layer2_score", "layer3_score",
         "overall_score", "competency_analytical", "competency_numerical",
         "competency_verbal", "competency_strategic", "competency_adaptability",
@@ -415,11 +424,21 @@ def save_final_score(data: dict) -> None:
         "top_fit", "recruiter_summary", "candidate_feedback",
         "layer3_skipped", "layer3_skip_reason",
     ]
-    placeholders = ",".join(["?"] * len(cols))
     with get_conn() as conn:
+        fs_cols = _existing_columns(conn, "final_scores")
+        cols = [c for c in desired_cols if c in fs_cols]
+        if not cols:
+            return
+        placeholders = ",".join(["?"] * len(cols))
+
+        def _default_for(col: str):
+            if col.startswith("ai_flag_") or col == "layer3_skipped":
+                return 0
+            return None
+
         conn.execute(
             f"INSERT OR REPLACE INTO final_scores ({','.join(cols)}) VALUES ({placeholders})",
-            tuple(data.get(c, 0 if c.startswith("ai_flag_") else None) for c in cols),
+            tuple(data.get(c, _default_for(c)) for c in cols),
         )
 
 
