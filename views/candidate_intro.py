@@ -66,7 +66,7 @@ def render() -> None:
     with k2:
         ui.metric("~60 min", "Total time")
     with k3:
-        ui.metric("Auto-save", "Resume any time")
+        ui.metric("2-hour resume", "Sign back in to your current layer")
     with k4:
         ui.metric("End-of-session", "Personalised feedback")
 
@@ -76,8 +76,9 @@ def render() -> None:
     # ── Quiet reassurance + setup banner ─────────────────────────────────
     ui.info_banner(
         "Find a quiet spot, make sure your microphone works, and give "
-        "yourself uninterrupted time. Your progress saves automatically - "
-        "if you close the tab, sign back in with the same email to resume.",
+        "yourself uninterrupted time. If you need to close the tab, sign "
+        "back in with the same email within two hours and you will pick "
+        "up at the start of your current section.",
         icon="ℹ",
     )
 
