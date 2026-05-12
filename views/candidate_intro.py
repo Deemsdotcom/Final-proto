@@ -78,7 +78,7 @@ def render() -> None:
         "Find a quiet spot, make sure your microphone works, and give "
         "yourself uninterrupted time. If you need to close the tab, sign "
         "back in with the same email within two hours and you will pick "
-        "up at the start of your current section.",
+        "up at the start of the last layer you fully went through.",
         icon="ℹ",
     )
 
