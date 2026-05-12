@@ -66,7 +66,7 @@ def render() -> None:
     with k2:
         ui.metric("~60 min", "Total time")
     with k3:
-        ui.metric("2-hour resume", "Sign back in to your current layer")
+        ui.metric("Sign in to your current layer", "within 2 hours")
     with k4:
         ui.metric("End-of-session", "Personalised feedback")
 
