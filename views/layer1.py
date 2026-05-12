@@ -610,8 +610,21 @@ def _render_question(
             except Exception:
                 pass
 
-        # Large question stem.
-        ui.question_stem(question.question_text)
+        # Large question stem. Verbal questions tend to be much longer
+        # than logical / numerical, so we render their stem one step
+        # smaller and let \n\n in the text become paragraph breaks
+        # (Passage: ... then Statement: ... on its own paragraph).
+        if theme == "verbal":
+            parts = [p.strip() for p in question.question_text.split("\n\n") if p.strip()]
+            for part in parts:
+                st.markdown(
+                    '<div class="cap-q-stem" style="font-size:1.35rem;margin:0.4rem 0 0.8rem 0;">'
+                    + part.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    + '</div>',
+                    unsafe_allow_html=True,
+                )
+        else:
+            ui.question_stem(question.question_text)
 
         # Optional second image (abstract: A-E option grid).
         if question.answer_image_path:
