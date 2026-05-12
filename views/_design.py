@@ -212,6 +212,7 @@ _GLOBAL_CSS = f"""
 .stApp [data-testid="stVerticalBlockBorderWrapper"] {{
     background: {NAVY_CARD} !important;
     border: 1px solid {NAVY_BORDER} !important;
+    border-top: 3px solid {BLUE_CYAN} !important;
     border-radius: 8px !important;
     box-shadow: 0 2px 16px rgba(0,0,0,0.25) !important;
     display: flex !important;

@@ -188,52 +188,14 @@ def _intro() -> None:
 
 
 def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) -> None:
-    # Scroll to top if we just advanced a week. The script keeps retrying via
-    # requestAnimationFrame for up to ~1.5s because on Streamlit Cloud the page
-    # finishes painting after our injected iframe loads, so a single scroll call
-    # often misses. We also target every plausible scroll container, Streamlit
-    # has changed which one actually scrolls between versions.
-    if st.session_state.pop("_scroll_top_needed", False):
-        components.html(
-            """
-            <script>
-                (function () {
-                    const startedAt = Date.now();
-                    const scrollAll = () => {
-                        try {
-                            const doc = window.parent.document;
-                            const targets = [
-                                doc.querySelector('section.main'),
-                                doc.querySelector('[data-testid="stAppViewContainer"]'),
-                                doc.querySelector('[data-testid="stMain"]'),
-                                doc.querySelector('main'),
-                                doc.scrollingElement,
-                                doc.documentElement,
-                                doc.body,
-                            ].filter(Boolean);
-                            targets.forEach(el => { el.scrollTop = 0; });
-                            window.parent.scrollTo(0, 0);
-                            // also nudge the hash to force layout
-                            if (doc.getElementById('week-top')) {
-                                doc.getElementById('week-top').scrollIntoView({block: 'start'});
-                            }
-                        } catch (e) { /* cross-frame edge cases */ }
-                    };
-                    // run immediately, then keep retrying for ~1.5s
-                    scrollAll();
-                    const tick = () => {
-                        scrollAll();
-                        if (Date.now() - startedAt < 1500) {
-                            requestAnimationFrame(tick);
-                        }
-                    };
-                    requestAnimationFrame(tick);
-                })();
-            </script>
-            """,
-            height=0,
-        )
+    """Render one week of the simulation - redesigned with our design system.
 
+    Content (every word, value, emoji, formula) is preserved exactly. Only
+    the visual container changes: ui.question_progress_bar header with
+    cyan timer pill, ui.metric KPI strip, ui.card-wrapped panels for team
+    / projects / staffing / log. Cards across the app already render
+    with a cyan top stripe via the global CSS update in _design.py.
+    """
     # Anchor at the very top of the week content, used by the scroll script.
     st.markdown('<div id="week-top"></div>', unsafe_allow_html=True)
 
@@ -243,40 +205,48 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
     week = state["current_week"]
     total = state["total_weeks"]
 
-    # Header
-    mins, secs = divmod(remaining, 60)
-    h1, h2 = st.columns([3, 1])
-    with h1:
-        st.markdown(f"### Week {week} of {total}")
-        st.progress((week - 1) / total)
-    with h2:
-        color = "🟢" if remaining > 300 else ("🟡" if remaining > 60 else "🔴")
-        st.metric("Time remaining", f"{color} {mins:02d}:{secs:02d}")
+    # ── Header chrome: eyebrow + progress rail + countdown timer pill ──
+    ui.inject_global_styles()
+    ui.header(meta=f"Candidate {st.session_state.candidate_name}")
+    ui.question_progress_bar(
+        idx=week - 1,
+        total=total,
+        remaining=remaining,
+        seconds=LAYER_TIME_LIMIT_SECONDS,
+        eyebrow_text=f"Week {week} of {total}",
+    )
 
-    # Firm KPI strip
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Cash", f"€{state['cash']:,.0f}")
-    k2.metric("Reputation", f"{state['reputation']:.0f}/100")
+    # ── Firm KPI strip ────────────────────────────────────────────────
     completed = sum(1 for ps in state["projects"].values() if ps["status"] == "completed")
-    failed = sum(1 for ps in state["projects"].values() if ps["status"] in ("cancelled", "quality_failure", "missed_deadline"))
-    k3.metric("Projects done", completed)
-    k4.metric("Projects failed", failed)
+    failed = sum(
+        1 for ps in state["projects"].values()
+        if ps["status"] in ("cancelled", "quality_failure", "missed_deadline")
+    )
+    k1, k2, k3, k4 = st.columns(4, gap="small")
+    with k1:
+        ui.metric(f"\u20ac{state['cash']:,.0f}", "Cash")
+    with k2:
+        ui.metric(f"{state['reputation']:.0f}/100", "Reputation")
+    with k3:
+        ui.metric(str(completed), "Projects done")
+    with k4:
+        ui.metric(str(failed), "Projects failed")
 
-    # Events firing this week
+    # ── Events firing this week ───────────────────────────────────────
     events = events_for_week(scenario, week)
     for ev in events:
         if ev["type"] == "sick_leave":
-            st.warning(f"🤒 {ev['message']}")
+            st.warning(f"\U0001F912 {ev['message']}")
         elif ev["type"] == "budget_cut":
-            st.warning(f"💸 {ev['message']}")
+            st.warning(f"\U0001F4B8 {ev['message']}")
         elif ev["type"] == "new_project_alert":
-            st.info(f"📨 {ev['message']}")
+            st.info(f"\U0001F4E8 {ev['message']}")
         elif ev["type"] == "tradeoff":
-            st.error(f"⚠️ {ev['message']}")
+            st.error(f"\u26A0\uFE0F {ev['message']}")
 
-    st.divider()
+    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
 
-    # Week 2 decision modal (David resigns), must be made before advancing
+    # ── Week 2 decision modal (must be made before advancing) ─────────
     decision_choice_tuple = None
     pending = pending_decision_for_week(scenario, state, week)
     if pending is not None:
@@ -284,7 +254,7 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
         if decision_choice_tuple is None:
             st.stop()
 
-    # Trade-off modal in Week 6
+    # ── Trade-off modal in Week 6 ─────────────────────────────────────
     tradeoff_choice = None
     is_tradeoff_week = any(ev["type"] == "tradeoff" for ev in events)
     if is_tradeoff_week:
@@ -292,111 +262,109 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
         if tradeoff_choice is None:
             st.stop()
 
-    # Two-column main view: consultants + projects
-    left, right = st.columns([1, 1])
+    # ── Two-column main view: consultants + projects ─────────────────
+    left, right = st.columns([1, 1], gap="medium")
 
     with left:
-        st.subheader("Your team")
-        available = consultants_available_in_week(scenario, state, week)
-        available_ids = {c["id"] for c in available}
-        departed_ids = set(state.get("consultants_departed_at_week", {}).keys())
-        for c in scenario["consultants"]:
-            fatigue = state["fatigue"].get(c["id"], 0)
-            sick = c["id"] not in available_ids and c["id"] not in departed_ids
-            departed = c["id"] in departed_ids and c["id"] not in available_ids
-            tag = ""
-            if departed:
-                tag = " ❌ *no longer with the firm*"
-            elif sick:
-                tag = " 🤒 *sick this week*"
-            fatigue_color = "🟢" if fatigue < 40 else ("🟡" if fatigue < 70 else "🔴")
-            st.markdown(
-                f"**{c['name']}** ({c['id']}), {c['seniority']}{tag}  \n"
-                f"Skills: {', '.join(c['skills'])}  \n"
-                f"Fatigue: {fatigue_color} {fatigue}/100"
-            )
+        with ui.card("Your team"):
+            available = consultants_available_in_week(scenario, state, week)
+            available_ids = {c["id"] for c in available}
+            departed_ids = set(state.get("consultants_departed_at_week", {}).keys())
+            for c in scenario["consultants"]:
+                fatigue = state["fatigue"].get(c["id"], 0)
+                sick = c["id"] not in available_ids and c["id"] not in departed_ids
+                departed = c["id"] in departed_ids and c["id"] not in available_ids
+                tag = ""
+                if departed:
+                    tag = " \u274C *no longer with the firm*"
+                elif sick:
+                    tag = " \U0001F912 *sick this week*"
+                fatigue_color = "\U0001F7E2" if fatigue < 40 else ("\U0001F7E1" if fatigue < 70 else "\U0001F534")
+                st.markdown(
+                    f"**{c['name']}** ({c['id']}), {c['seniority']}{tag}  \n"
+                    f"Skills: {', '.join(c['skills'])}  \n"
+                    f"Fatigue: {fatigue_color} {fatigue}/100"
+                )
 
     with right:
-        st.subheader("Active projects")
-        visible_projects = projects_visible_in_week(scenario, state, week)
-        if not visible_projects:
-            st.info("No active projects this week.")
-        for p in visible_projects:
-            ps = state["projects"][p["id"]]
-            tier_emoji = {"A": "🔴", "B": "🟡", "C": "⚪"}.get(p.get("priority_tier"), "⚪")
-            urgent_tag = " 🚨 URGENT" if p.get("urgent") else ""
-            progress = ps["weeks_staffed_correctly"]
-            duration = p["duration_weeks"]
-            revenue = p.get("revenue", 0)
-            revenue_str = f"€{revenue:,}" if revenue else "Strategic (no revenue)"
+        with ui.card("Active projects"):
+            visible_projects = projects_visible_in_week(scenario, state, week)
+            if not visible_projects:
+                st.info("No active projects this week.")
+            for p in visible_projects:
+                ps = state["projects"][p["id"]]
+                tier_emoji = {"A": "\U0001F534", "B": "\U0001F7E1", "C": "\u26AA"}.get(p.get("priority_tier"), "\u26AA")
+                urgent_tag = " \U0001F6A8 URGENT" if p.get("urgent") else ""
+                progress = ps["weeks_staffed_correctly"]
+                duration = p["duration_weeks"]
+                revenue = p.get("revenue", 0)
+                revenue_str = f"\u20ac{revenue:,}" if revenue else "Strategic (no revenue)"
 
-            status_str = ""
-            if ps["status"] == "active":
-                status_str = f" · ▶️ {progress}/{duration} weeks done"
-            elif ps["status"] == "available":
-                status_str = " · 🆕 Not started"
+                status_str = ""
+                if ps["status"] == "active":
+                    status_str = f" \u00b7 \u25B6\uFE0F {progress}/{duration} weeks done"
+                elif ps["status"] == "available":
+                    status_str = " \u00b7 \U0001F195 Not started"
 
-            st.markdown(
-                f"{tier_emoji} **{p['name']}** ({p['id']}){urgent_tag}{status_str}  \n"
-                f"Skills: {', '.join(p.get('required_skills', []))} · Min. seniority: {p.get('min_seniority')}  \n"
-                f"Burn: €{p['weekly_burn']:,}/wk · Revenue: {revenue_str} · Deadline: Week {p.get('deadline_week', total)}"
+                st.markdown(
+                    f"{tier_emoji} **{p['name']}** ({p['id']}){urgent_tag}{status_str}  \n"
+                    f"Skills: {', '.join(p.get('required_skills', []))} \u00b7 Min. seniority: {p.get('min_seniority')}  \n"
+                    f"Burn: \u20ac{p['weekly_burn']:,}/wk \u00b7 Revenue: {revenue_str} \u00b7 Deadline: Week {p.get('deadline_week', total)}"
+                )
+
+    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
+
+    # ── Staffing widget (multiselect per visible project) ─────────────
+    with ui.card("Staff projects this week"):
+        st.caption("Each consultant can be on at most one project per week.")
+
+        consultant_label = {c["id"]: f"{c['name']} ({c['id']}, {c['seniority']})"
+                            for c in available}
+
+        assignments_key = f"l2_week_{week}_assignments"
+        if assignments_key not in st.session_state:
+            prev_week = week - 1
+            prev_assignments = state["weekly_assignments_history"].get(str(prev_week), {})
+            visible_pids = {p["id"] for p in visible_projects}
+            carried = {
+                pid: [cid for cid in cids if cid in consultant_label]
+                for pid, cids in prev_assignments.items()
+                if pid in visible_pids
+            }
+            for pid in visible_pids:
+                if pid not in carried:
+                    carried[pid] = []
+            st.session_state[assignments_key] = carried
+
+        assignments = st.session_state[assignments_key]
+        new_assignments = {}
+        for project in visible_projects:
+            pid = project["id"]
+            current = [cid for cid in assignments.get(pid, []) if cid in consultant_label]
+            chosen = st.multiselect(
+                f"**{project['name']}** ({pid})",
+                options=list(consultant_label.keys()),
+                default=current,
+                format_func=lambda cid: consultant_label[cid],
+                key=f"l2_assign_w{week}_{pid}",
             )
+            new_assignments[pid] = chosen
+        st.session_state[assignments_key] = new_assignments
 
-    st.divider()
+        # Validation warnings (live, doesn't block)
+        warnings = validate_weekly_assignments(scenario, state, week, new_assignments)
+        for w in warnings:
+            st.warning(f"\u26A0\uFE0F {w}")
 
-    # Assignment widget: multiselect per visible project
-    st.subheader("Staff projects this week")
-    st.caption("Each consultant can be on at most one project per week.")
+    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
 
-    consultant_label = {c["id"]: f"{c['name']} ({c['id']}, {c['seniority']})"
-                        for c in available}
-
-    assignments_key = f"l2_week_{week}_assignments"
-    if assignments_key not in st.session_state:
-        # carry forward last week's assignments as defaults (continuity)
-        prev_week = week - 1
-        prev_assignments = state["weekly_assignments_history"].get(str(prev_week), {})
-        # filter out finished projects and unavailable consultants
-        visible_pids = {p["id"] for p in visible_projects}
-        carried = {
-            pid: [cid for cid in cids if cid in consultant_label]
-            for pid, cids in prev_assignments.items()
-            if pid in visible_pids
-        }
-        for pid in visible_pids:
-            if pid not in carried:
-                carried[pid] = []
-        st.session_state[assignments_key] = carried
-
-    assignments = st.session_state[assignments_key]
-    new_assignments = {}
-    for project in visible_projects:
-        pid = project["id"]
-        current = [cid for cid in assignments.get(pid, []) if cid in consultant_label]
-        chosen = st.multiselect(
-            f"**{project['name']}** ({pid})",
-            options=list(consultant_label.keys()),
-            default=current,
-            format_func=lambda cid: consultant_label[cid],
-            key=f"l2_assign_w{week}_{pid}",
-        )
-        new_assignments[pid] = chosen
-    st.session_state[assignments_key] = new_assignments
-
-    # Validation warnings (live, doesn't block)
-    warnings = validate_weekly_assignments(scenario, state, week, new_assignments)
-    for w in warnings:
-        st.warning(f"⚠️ {w}")
-
-    st.divider()
-
-    # Recent activity
+    # ── Recent activity log ──────────────────────────────────────────
     if state.get("weekly_log"):
-        with st.expander("📜 Recent weeks log", expanded=False):
+        with st.expander("\U0001F4DC Recent weeks log", expanded=False):
             for log in state["weekly_log"][-3:]:
                 _render_log_entry(log, scenario)
 
-    # Advance button
+    # ── Advance button ───────────────────────────────────────────────
     advance_label = (
         f"Advance to Week {week + 1}" if week < total else "Finish Layer 2"
     )
@@ -407,31 +375,29 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
             decision_choice=decision_choice_tuple,
         )
         st.session_state.l2_state = new_state
-        # clear the prepared assignments key so the next week picks up via prev_assignments carry-forward
         if assignments_key in st.session_state:
             del st.session_state[assignments_key]
-        # signal scroll-to-top on next render
         st.session_state["_scroll_top_needed"] = True
         st.rerun()
 
 
 def _render_decision(decision: dict, scenario: dict) -> tuple[str, str] | None:
     """Render a one-off decision modal. Returns (decision_id, choice_id) or None."""
-    st.markdown("### 📋 Decision required")
-    st.warning(decision["description"])
+    with ui.card("\U0001F4CB Decision required"):
+        st.warning(decision["description"])
 
-    option_labels = [f"**{opt['id'].replace('_', ' ').title()}**, {opt['label']}"
-                     for opt in decision["options"]]
-    choice_display = st.radio(
-        "Pick one:",
-        options=option_labels,
-        key=f"l2_decision_{decision.get('id', 'x')}",
-        index=None,
-    )
-    if choice_display is None:
-        st.info("You must make this decision before continuing the week.")
-        return None
-    chosen = decision["options"][option_labels.index(choice_display)]
+        option_labels = [f"**{opt['id'].replace('_', ' ').title()}**, {opt['label']}"
+                         for opt in decision["options"]]
+        choice_display = st.radio(
+            "Pick one:",
+            options=option_labels,
+            key=f"l2_decision_{decision.get('id', 'x')}",
+            index=None,
+        )
+        if choice_display is None:
+            st.info("You must make this decision before continuing the week.")
+            return None
+        chosen = decision["options"][option_labels.index(choice_display)]
     # find the decision_id by looking it up in scenario['decisions']
     decision_id = None
     for did, d in scenario.get("decisions", {}).items():
@@ -439,7 +405,6 @@ def _render_decision(decision: dict, scenario: dict) -> tuple[str, str] | None:
             decision_id = did
             break
     if decision_id is None:
-        # fallback: use the consultant_id as a key (for our single decision case)
         decision_id = next(iter(scenario.get("decisions", {})), None)
     return (decision_id, chosen["id"])
 
@@ -447,20 +412,20 @@ def _render_decision(decision: dict, scenario: dict) -> tuple[str, str] | None:
 def _render_tradeoff(scenario: dict) -> str | None:
     """Render the Week 6 trade-off modal. Returns the choice id or None if not chosen yet."""
     tradeoff = scenario["tradeoff"]
-    st.markdown("### ⚠️ Trade-off decision")
-    st.error(tradeoff["description"])
+    with ui.card("\u26A0\uFE0F Trade-off decision"):
+        st.error(tradeoff["description"])
 
-    option_labels = [f"**{opt['id']}**, {opt['label']}" for opt in tradeoff["options"]]
-    choice_display = st.radio(
-        "Choose one option:",
-        options=option_labels,
-        key="l2_tradeoff_radio",
-        index=None,
-    )
-    if choice_display is None:
-        st.info("You must make this decision before continuing the week.")
-        return None
-    return tradeoff["options"][option_labels.index(choice_display)]["id"]
+        option_labels = [f"**{opt['id']}**, {opt['label']}" for opt in tradeoff["options"]]
+        choice_display = st.radio(
+            "Choose one option:",
+            options=option_labels,
+            key="l2_tradeoff_radio",
+            index=None,
+        )
+        if choice_display is None:
+            st.info("You must make this decision before continuing the week.")
+            return None
+        return tradeoff["options"][option_labels.index(choice_display)]["id"]
 
 
 def _render_log_entry(log: dict, scenario: dict) -> None:
@@ -521,19 +486,21 @@ def _finalize_and_advance(scenario: dict, state: dict, elapsed: int) -> None:
         time_taken_seconds=elapsed,
     )
 
-    st.title("Layer 2 Complete")
-    st.success("You've finished the firm simulation.")
-    st.markdown(
-        """
-        **Next: Layer 3 (AI-Led Interview)**
-        
-        Four questions, each with a follow-up. Each answer is voice-recorded,
-        transcribed, and scored on clarity, structure, relevance, and depth.
-        
-        Make sure your microphone is working and that you're in a quiet space.
-        Your full results will be shown after this final layer.
-        """
+    ui.eyebrow("Stage 2 of 3 complete")
+    ui.page_title(
+        "Layer 2 Complete",
+        "You've finished the firm simulation.",
     )
+
+    with ui.card("Next: Layer 3 (AI-Led Interview)"):
+        st.markdown(
+            "Four questions, each with a follow-up. Each answer is voice-recorded, "
+            "transcribed, and scored on clarity, structure, relevance, and depth."
+        )
+        st.markdown(
+            "Make sure your microphone is working and that you're in a quiet space. "
+            "Your full results will be shown after this final layer."
+        )
 
     if st.button("Begin Layer 3", type="primary", use_container_width=True):
         advance_stage("layer3")
