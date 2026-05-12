@@ -243,23 +243,12 @@ def _layer_overview() -> None:
     ui.header(meta=f"Candidate {st.session_state.candidate_name}")
 
     ui.eyebrow("Stage 1 of 3 · Cognitive Assessment")
-    ui.page_title(
-        "Layer 1: Cognitive Assessment",
-        "Three reasoning themes, one timed sprint. Each theme has its own time block; the clock runs continuously across the theme, not per question.",
-    )
+    ui.page_title("Layer 1: Cognitive Assessment")
 
-    # Team v9 obligatory: the three-theme numbered list + the time-block
-    # paragraph. Written as plain markdown so the candidate sees it in
-    # the exact agreed wording.
+    # The three theme descriptions live inside the hero cards below
+    # (not duplicated here). The rule paragraph stays, since it covers
+    # behaviour the cards don't repeat.
     st.markdown(
-        "Layer 1 has three themes you'll work through in order:\n\n"
-        "1. **Logical Reasoning**: abstract sequence puzzles. You'll see a "
-        "row of figures and pick the one that comes next in the pattern.\n"
-        "2. **Numerical Reasoning**: short charts and tables, followed by "
-        "a multiple-choice question about the data.\n"
-        "3. **Verbal Reasoning**: a short passage followed by a statement. "
-        "You decide whether the statement is **True**, **False**, or "
-        "**Cannot Say** based only on the passage.\n\n"
         "Each theme has **10 questions** and its own **time block, not a "
         "per-question timer**. The clock runs continuously over the whole "
         "theme. When the theme block ends, any unanswered questions are "
@@ -271,44 +260,59 @@ def _layer_overview() -> None:
 
     # Three theme hero cards
     c1, c2, c3 = st.columns(3, gap="medium")
+    def _theme_time_label(theme: str) -> str:
+        """Format a theme time-budget as 'M min' or 'M min S sec' when
+        there are leftover seconds. Logical is 750s = 12 min 30 sec,
+        verbal is 450s = 7 min 30 sec, numerical is 900s = 15 min.
+        """
+        secs = theme_time_limit_for(theme)
+        mins, leftover = divmod(secs, 60)
+        if leftover == 0:
+            return f"{mins} min"
+        return f"{mins} min {leftover} sec"
+
     with c1:
-        seconds = theme_time_limit_for("logical")
-        mins = seconds // 60
         ui.theme_card(
             icon_svg=ui.THEME_ICON_LOGICAL,
             meta="Theme 1",
             title="Logical Reasoning",
             desc=(
-                "Figure sequences. Spot how each figure changes from one to the next, "
-                "then pick the one that comes next."
+                "Abstract sequence puzzles. You'll see a row of figures "
+                "and pick the one that comes next in the pattern."
             ),
-            stats=[(f"{QUESTIONS_PER_THEME}", "Questions"), (f"{mins} min", "Theme time")],
+            stats=[
+                (f"{QUESTIONS_PER_THEME}", "Questions"),
+                (_theme_time_label("logical"), "Theme time"),
+            ],
         )
     with c2:
-        seconds = theme_time_limit_for("numerical")
-        mins = seconds // 60
         ui.theme_card(
             icon_svg=ui.THEME_ICON_NUMERICAL,
             meta="Theme 2",
             title="Numerical Reasoning",
             desc=(
-                "Short charts and tables followed by a multiple-choice question. "
-                "Percentages, ratios, growth rates - calculator recommended."
+                "Short charts and tables, followed by a multiple-choice "
+                "question about the data."
             ),
-            stats=[(f"{QUESTIONS_PER_THEME}", "Questions"), (f"{mins} min", "Theme time")],
+            stats=[
+                (f"{QUESTIONS_PER_THEME}", "Questions"),
+                (_theme_time_label("numerical"), "Theme time"),
+            ],
         )
     with c3:
-        seconds = theme_time_limit_for("verbal")
-        mins = seconds // 60
         ui.theme_card(
             icon_svg=ui.THEME_ICON_VERBAL,
             meta="Theme 3",
             title="Verbal Reasoning",
             desc=(
-                "Read a short passage, then judge a statement: True, False, or "
-                "Cannot Say. Use only what the passage says - no outside knowledge."
+                "A short passage followed by a statement. You decide "
+                "whether the statement is True, False, or Cannot Say "
+                "based only on the passage."
             ),
-            stats=[(f"{QUESTIONS_PER_THEME}", "Questions"), (f"{mins} min", "Theme time")],
+            stats=[
+                (f"{QUESTIONS_PER_THEME}", "Questions"),
+                (_theme_time_label("verbal"), "Theme time"),
+            ],
         )
 
     st.markdown("<div style='height:1.25rem'></div>", unsafe_allow_html=True)
