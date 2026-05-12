@@ -119,14 +119,23 @@ def _render_intro() -> None:
     # otherwise we'd be waiting on the voices-loaded fallback timer.
     prewarm_tts()
 
-    with ui.card(eyebrow_text="Before you begin"):
-        st.markdown(
-            "- Put on headphones if you can - it stops the AI's voice from feeding into your microphone.  \n"
-            "- When the browser asks for microphone access, click Allow. You only need to grant it once.  \n"
-            "- The AI will read each question out loud, then listen. Just speak naturally - "
-            "the call will move on by itself when you stop talking.  \n"
-            "- You won't see the questions or your transcript on the screen. Treat it like a real phone interview."
-        )
+    # 'Before you begin' rendered as a cap-feat block (cyan top stripe +
+    # cyan eyebrow + cap-feat-tips numbered list). Matches the visual
+    # language of the Layer 2 intro and the layer-complete screens.
+    st.markdown(
+        '''
+<div class="cap-feat" style="margin-bottom:1rem;">
+  <div class="cap-feat-eyebrow">Before you begin</div>
+  <ul class="cap-feat-tips">
+    <li>Put on headphones if you can - it stops the AI\'s voice from feeding into your microphone.</li>
+    <li>When the browser asks for microphone access, click Allow. You only need to grant it once.</li>
+    <li>The AI will read each question out loud, then listen. Just speak naturally - the call will move on by itself when you stop talking.</li>
+    <li>You won\'t see the questions or your transcript on the screen. Treat it like a real phone interview.</li>
+  </ul>
+</div>
+''',
+        unsafe_allow_html=True,
+    )
 
     if not MIC_AVAILABLE:
         ui.info_banner(
