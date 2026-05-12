@@ -769,11 +769,10 @@ def _finish_layer(candidate_id: str) -> None:
     ui.inject_global_styles()
     ui.header(meta=f"Candidate {st.session_state.candidate_name}")
 
-    ui.completion_badge()
-    ui.eyebrow("Stage 1 of 3 complete")
-    ui.page_title(
-        "Layer 1 Complete",
-        "Nice work, you've finished the cognitive assessment. Your full results will be shown after you complete all three layers.",
+    ui.layer_complete_hero(
+        eyebrow="Stage 1 of 3 complete",
+        title="Layer 1 Complete",
+        subtitle="Nice work, you've finished the cognitive assessment. Your full results will be shown after you complete all three layers.",
     )
 
     with ui.card("Up next"):

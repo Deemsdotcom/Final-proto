@@ -1272,6 +1272,36 @@ def numbered_rule(num: int, text: str, severity: str = "info") -> None:
     )
 
 
+def layer_complete_hero(eyebrow: str, title: str, subtitle: str) -> None:
+    """Centered celebration hero for layer-complete screens.
+
+    Renders the teal checkmark badge, the eyebrow ('STAGE N OF 3
+    COMPLETE'), the big page title ('Layer N Complete'), and the
+    subtitle paragraph - all stacked, centred, on a single visual
+    block. Replaces calling completion_badge + eyebrow + page_title
+    separately, which produced an awkward mix of centred badge above
+    left-aligned text.
+    """
+    st.markdown(
+        '''
+<div style="text-align:center;margin:1.5rem 0 1.6rem 0;">
+  <div style="display:inline-flex;align-items:center;justify-content:center;width:68px;height:68px;border-radius:50%;background:rgba(0,213,208,0.14);border:2px solid #00D5D0;box-shadow:0 0 0 6px rgba(0,213,208,0.07);margin-bottom:1.1rem;">
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#00D5D0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+  </div>
+  <div style="font-size:0.82rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#1DB8F2;margin-bottom:0.55rem;">EYEBROW_HERE</div>
+  <h1 style="margin:0 0 0.7rem 0;font-size:2.9rem;font-weight:700;line-height:1.1;color:#FFFFFF;">TITLE_HERE</h1>
+  <p style="color:#A0AECB;font-size:1.12rem;line-height:1.55;margin:0 auto;max-width:680px;">SUBTITLE_HERE</p>
+</div>
+'''
+        .replace("EYEBROW_HERE", _esc(eyebrow))
+        .replace("TITLE_HERE", _esc(title))
+        .replace("SUBTITLE_HERE", _esc(subtitle)),
+        unsafe_allow_html=True,
+    )
+
+
 def completion_badge() -> None:
     """Centred 'all done' checkmark in a teal circle.
 

@@ -675,11 +675,10 @@ def _finalize_and_advance(scenario: dict, state: dict, elapsed: int) -> None:
     ui.inject_global_styles()
     ui.header(meta=f"Candidate {st.session_state.candidate_name}")
 
-    ui.completion_badge()
-    ui.eyebrow("Stage 2 of 3 complete")
-    ui.page_title(
-        "Layer 2 Complete",
-        "You've finished the firm simulation.",
+    ui.layer_complete_hero(
+        eyebrow="Stage 2 of 3 complete",
+        title="Layer 2 Complete",
+        subtitle="You've finished the firm simulation.",
     )
 
     with ui.card("Up next"):
