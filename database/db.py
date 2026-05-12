@@ -432,24 +432,44 @@ def get_final_score(candidate_id: str) -> Optional[dict]:
 
 
 def get_all_completed_candidates() -> list[dict]:
-    """Join candidates + final_scores for the recruiter dashboard."""
+    """Join candidates + final_scores for the recruiter dashboard.
+
+    Defensive against schema drift: only SELECT columns that actually
+    exist in final_scores right now. If a migration for a column failed
+    on this DB (the in-place ALTER TABLE is wrapped in try/except so app
+    boot can't be blocked by a single column add), the column is simply
+    omitted from the result dicts. The dashboard code uses .get() on
+    every read so missing keys degrade gracefully.
+    """
     with get_conn() as conn:
-        rows = conn.execute(
-            """SELECT c.candidate_id, c.full_name, c.email, c.started_at, c.completed_at,
-                      f.layer1_score, f.layer2_score, f.layer3_score, f.overall_score,
-                      f.competency_analytical, f.competency_numerical, f.competency_verbal,
-                      f.competency_strategic, f.competency_adaptability,
-                      f.competency_l3_growth_mindset,
-                      f.competency_l3_adaptability, f.competency_l3_collaboration,
-                      f.competency_l3_self_reflection,
-                      f.ai_flag_logical, f.ai_flag_numerical, f.ai_flag_verbal, f.ai_flag_layer2,
-                      f.top_fit, f.recruiter_summary, f.candidate_feedback,
-                      f.layer3_skipped, f.layer3_skip_reason
-               FROM candidates c
-               JOIN final_scores f ON c.candidate_id = f.candidate_id
-               WHERE c.completed_at IS NOT NULL
-               ORDER BY c.completed_at DESC"""
-        ).fetchall()
+        fs_cols = _existing_columns(conn, "final_scores")
+        cand_cols = ["candidate_id", "full_name", "email", "started_at", "completed_at"]
+        # Optional final_scores columns the dashboard reads, in priority order.
+        optional = [
+            "layer1_score", "layer2_score", "layer3_score", "overall_score",
+            "competency_analytical", "competency_numerical", "competency_verbal",
+            "competency_strategic", "competency_adaptability",
+            "competency_l3_growth_mindset",
+            "competency_l3_adaptability", "competency_l3_collaboration",
+            "competency_l3_self_reflection",
+            "ai_flag_logical", "ai_flag_numerical", "ai_flag_verbal", "ai_flag_layer2",
+            "top_fit", "recruiter_summary", "candidate_feedback",
+            "layer3_skipped", "layer3_skip_reason",
+            # Legacy / pre-merge columns - keep so old rows still render.
+            "competency_l3_proactivity", "competency_l3_learning_mindset",
+            "competency_l3_growth_driven_mindset",
+        ]
+        present = [c for c in optional if c in fs_cols]
+
+        select_parts = [f"c.{c}" for c in cand_cols] + [f"f.{c}" for c in present]
+        sql = (
+            "SELECT " + ", ".join(select_parts) + " "
+            "FROM candidates c "
+            "JOIN final_scores f ON c.candidate_id = f.candidate_id "
+            "WHERE c.completed_at IS NOT NULL "
+            "ORDER BY c.completed_at DESC"
+        )
+        rows = conn.execute(sql).fetchall()
         return [dict(r) for r in rows]
 
 
