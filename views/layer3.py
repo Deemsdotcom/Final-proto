@@ -109,9 +109,14 @@ def _ensure_state_defaults() -> None:
 
 def _render_intro() -> None:
     ui.eyebrow("Stage 3 of 3 · AI-led interview")
-    ui.page_title(
-        "Layer 3: Voice call with an AI recruiter",
-        subtitle="Four short questions, around sixteen minutes. Speak openly - there are no right or wrong answers.",
+    ui.page_title("Layer 3: Voice call with an AI recruiter")
+    # Subtitle rendered as its own paragraph so we can override the
+    # cap-subtitle max-width (680px) and keep the line in one row.
+    st.markdown(
+        '<p class="cap-subtitle" style="max-width:none;">'
+        'Four short questions, around sixteen minutes. Speak openly - there are no right or wrong answers.'
+        '</p>',
+        unsafe_allow_html=True,
     )
 
     # Quietly warm the browser's TTS engine while the candidate reads the
