@@ -15,6 +15,8 @@ from .db import (
     get_layer3_results,
     count_layer3_answered,
     clear_layer3_results,
+    clear_layer1_results,
+    clear_layer2_simulation,
     purge_expired_candidates,
     save_final_score,
     get_final_score,

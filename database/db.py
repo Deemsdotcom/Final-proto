@@ -522,3 +522,21 @@ def clear_layer3_results(candidate_id: str) -> None:
             "DELETE FROM layer3_results WHERE candidate_id = ?",
             (candidate_id,),
         )
+
+
+def clear_layer1_results(candidate_id: str) -> None:
+    """Wipe Layer 1 answer rows for a candidate (used on coarse resume)."""
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM layer1_results WHERE candidate_id = ?",
+            (candidate_id,),
+        )
+
+
+def clear_layer2_simulation(candidate_id: str) -> None:
+    """Wipe the Layer 2 simulation row for a candidate (used on coarse resume)."""
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM layer2_simulation WHERE candidate_id = ?",
+            (candidate_id,),
+        )

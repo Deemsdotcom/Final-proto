@@ -100,9 +100,21 @@ def _candidate_form() -> None:
 
     existing = db.find_candidate_by_email(email.strip().lower())
     if existing and existing["current_stage"] not in ("done",):
+        # Coarse resume: the candidate goes back to the START of whichever
+        # layer they were in. Earlier completed layers are preserved.
+        # Outside the 2-hour TTL window the row would have been purged
+        # entirely, so a same-email login here always lands inside a
+        # warm session.
+        nice = {
+            "intro": "the welcome screen",
+            "layer1": "the start of Layer 1",
+            "layer2": "the start of Layer 2",
+            "layer3": "the start of Layer 3",
+            "results": "your results",
+            "done": "your completed assessment",
+        }.get(existing['current_stage'], existing['current_stage'])
         st.info(
-            f"Found an in-progress session from {existing['started_at'][:10]}. "
-            f"Resuming at stage: **{existing['current_stage']}**."
+            f"Welcome back. Picking up where you left off: **{nice}**."
         )
         resume_from_db(existing)
         st.rerun()
