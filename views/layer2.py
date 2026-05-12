@@ -376,14 +376,29 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
         if tradeoff_choice is None:
             st.stop()
 
+    # ── Effective departed set for THIS week's display + staffing ─────
+    # state.consultants_departed_at_week is updated by advance_week,
+    # but if the candidate just picked 'Accelerate' in the resignation
+    # modal we treat that consultant as gone NOW (same week) so they
+    # can't be assigned to any project below.
+    effective_departed = set(state.get("consultants_departed_at_week", {}).keys())
+    if decision_choice_tuple is not None:
+        _did, _choice_id = decision_choice_tuple
+        if _choice_id == "accelerate":
+            effective_departed.add(_did)
+
     # ── Two-column main view: consultants + projects ─────────────────
     left, right = st.columns([1, 1], gap="medium")
 
     with left:
         with ui.card("Your team"):
             available = consultants_available_in_week(scenario, state, week)
+            # Drop consultants we're treating as already gone so they
+            # don't appear in the staffing dropdowns or the available
+            # pool for this week.
+            available = [c for c in available if c["id"] not in effective_departed]
             available_ids = {c["id"] for c in available}
-            departed_ids = set(state.get("consultants_departed_at_week", {}).keys())
+            departed_ids = effective_departed
             for c in scenario["consultants"]:
                 fatigue = state["fatigue"].get(c["id"], 0)
                 sick = c["id"] not in available_ids and c["id"] not in departed_ids
