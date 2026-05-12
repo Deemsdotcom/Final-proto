@@ -207,6 +207,60 @@ _GLOBAL_CSS = f"""
     text-transform: uppercase;
 }}
 
+
+/* ── Layer 2 mini cards (consultants + projects) ───────────────────────── */
+.l2-mini {{
+    background: {NAVY_CARD_2};
+    border: 1px solid {NAVY_BORDER};
+    border-left: 3px solid {BLUE_CYAN};
+    border-radius: 8px;
+    padding: 0.85rem 1.05rem;
+    margin-bottom: 0.65rem;
+    position: relative;
+}}
+.l2-mini:last-child {{ margin-bottom: 0.2rem; }}
+.l2-mini-senior     {{ border-left-color: {BLUE_CYAN}; }}
+.l2-mini-manager    {{ border-left-color: {AMBER}; }}
+.l2-mini-consultant {{ border-left-color: rgba(160,174,203,0.45); }}
+.l2-mini-tier-a     {{ border-left-color: {RED}; }}
+.l2-mini-tier-b     {{ border-left-color: {AMBER}; }}
+.l2-mini-tier-c     {{ border-left-color: rgba(160,174,203,0.45); }}
+.l2-mini-title {{
+    color: {TEXT_PRIMARY};
+    font-size: var(--cap-text-body);
+    line-height: 1.35;
+    margin-bottom: 0.45rem;
+    font-weight: 500;
+}}
+.l2-mini-title strong {{
+    color: {BLUE_CYAN};
+    font-weight: 700;
+}}
+.l2-mini-title em {{
+    color: {TEXT_SECONDARY};
+    font-style: italic;
+    font-weight: 500;
+}}
+.l2-mini-line {{
+    color: {TEXT_PRIMARY};
+    font-size: var(--cap-text-body-sm);
+    line-height: 1.45;
+    margin-bottom: 0.25rem;
+}}
+.l2-mini-line:last-child {{ margin-bottom: 0; }}
+.l2-mini-bar {{
+    height: 5px;
+    background: rgba(0,0,0,0.32);
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 0.55rem;
+}}
+.l2-mini-bar-fill {{
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.4s ease;
+}}
+
 /* ── Cards (styled via Streamlit's bordered container) ─────────────────── */
 /* st.container(border=True) renders as stVerticalBlockBorderWrapper        */
 .stApp [data-testid="stVerticalBlockBorderWrapper"] {{

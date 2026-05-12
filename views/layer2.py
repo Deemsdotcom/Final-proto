@@ -187,6 +187,115 @@ def _intro() -> None:
         st.rerun()
 
 
+def _md_inline_to_html(text: str) -> str:
+    """Tiny markdown-bold + markdown-italic to HTML converter, used inside
+    the Layer 2 mini-card titles so the existing **Anna** / *sick this week*
+    text still renders correctly when we drop out of st.markdown into
+    raw-HTML containers."""
+    import re
+    text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+    text = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<em>\1</em>", text)
+    return text
+
+
+def _render_consultant_card(c, fatigue, sick, departed) -> None:
+    """Render one consultant as a styled mini-card.
+
+    Every word, number, emoji and the *italic* status marker from the
+    original markdown line is preserved verbatim inside the card. The
+    visual additions are: a left border colour-coded by seniority, and
+    a thin fatigue progress bar at the bottom (colour mirrors the
+    existing emoji indicator).
+    """
+    sen_cls = {
+        "Senior":     "l2-mini-senior",
+        "Manager":    "l2-mini-manager",
+    }.get(c["seniority"], "l2-mini-consultant")
+
+    tag = ""
+    if departed:
+        tag = " \u274C *no longer with the firm*"
+    elif sick:
+        tag = " \U0001F912 *sick this week*"
+
+    fatigue_emoji = "\U0001F7E2" if fatigue < 40 else ("\U0001F7E1" if fatigue < 70 else "\U0001F534")
+    fatigue_color = "#00D5D0" if fatigue < 40 else ("#FEB100" if fatigue < 70 else "#FF816E")
+
+    title = _md_inline_to_html(
+        f"<strong>{c['name']}</strong> ({c['id']}), {c['seniority']}{tag}"
+    )
+    skills_line = f"Skills: {', '.join(c['skills'])}"
+    fatigue_line = f"Fatigue: {fatigue_emoji} {fatigue}/100"
+
+    st.markdown(
+        f'<div class="l2-mini {sen_cls}">'
+        f'<div class="l2-mini-title">{title}</div>'
+        f'<div class="l2-mini-line">{skills_line}</div>'
+        f'<div class="l2-mini-line">{fatigue_line}</div>'
+        f'<div class="l2-mini-bar"><div class="l2-mini-bar-fill" '
+        f'style="width:{max(0, min(100, fatigue))}%;background:{fatigue_color};"></div></div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _render_project_card(p, ps, total: int) -> None:
+    """Render one project as a styled mini-card.
+
+    Every word, number, currency value, emoji and dot separator from
+    the original markdown line is preserved verbatim. The visual
+    additions are: a left border colour-coded by priority tier, and a
+    thin progress bar at the bottom (only when the project is active),
+    showing weeks staffed vs total duration.
+    """
+    tier = p.get("priority_tier", "C")
+    tier_cls = {"A": "l2-mini-tier-a", "B": "l2-mini-tier-b"}.get(tier, "l2-mini-tier-c")
+
+    tier_emoji = {"A": "\U0001F534", "B": "\U0001F7E1", "C": "\u26AA"}.get(tier, "\u26AA")
+    urgent_tag = " \U0001F6A8 URGENT" if p.get("urgent") else ""
+    progress = ps["weeks_staffed_correctly"]
+    duration = p["duration_weeks"]
+    revenue = p.get("revenue", 0)
+    revenue_str = f"\u20AC{revenue:,}" if revenue else "Strategic (no revenue)"
+
+    status_str = ""
+    if ps["status"] == "active":
+        status_str = f" \u00B7 \u25B6\uFE0F {progress}/{duration} weeks done"
+    elif ps["status"] == "available":
+        status_str = " \u00B7 \U0001F195 Not started"
+
+    title = _md_inline_to_html(
+        f"{tier_emoji} <strong>{p['name']}</strong> ({p['id']}){urgent_tag}{status_str}"
+    )
+    skills_line = (
+        f"Skills: {', '.join(p.get('required_skills', []))} \u00B7 "
+        f"Min. seniority: {p.get('min_seniority')}"
+    )
+    nums_line = (
+        f"Burn: \u20AC{p['weekly_burn']:,}/wk \u00B7 "
+        f"Revenue: {revenue_str} \u00B7 "
+        f"Deadline: Week {p.get('deadline_week', total)}"
+    )
+
+    bar_html = ""
+    if ps["status"] == "active" and duration > 0:
+        pct = max(0, min(100, int(progress / duration * 100)))
+        bar_html = (
+            f'<div class="l2-mini-bar"><div class="l2-mini-bar-fill" '
+            f'style="width:{pct}%;background:#1DB8F2;"></div></div>'
+        )
+
+    st.markdown(
+        f'<div class="l2-mini {tier_cls}">'
+        f'<div class="l2-mini-title">{title}</div>'
+        f'<div class="l2-mini-line">{skills_line}</div>'
+        f'<div class="l2-mini-line">{nums_line}</div>'
+        f'{bar_html}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) -> None:
     """Render one week of the simulation - redesigned with our design system.
 
@@ -277,17 +386,7 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
                 fatigue = state["fatigue"].get(c["id"], 0)
                 sick = c["id"] not in available_ids and c["id"] not in departed_ids
                 departed = c["id"] in departed_ids and c["id"] not in available_ids
-                tag = ""
-                if departed:
-                    tag = " \u274C *no longer with the firm*"
-                elif sick:
-                    tag = " \U0001F912 *sick this week*"
-                fatigue_color = "\U0001F7E2" if fatigue < 40 else ("\U0001F7E1" if fatigue < 70 else "\U0001F534")
-                st.markdown(
-                    f"**{c['name']}** ({c['id']}), {c['seniority']}{tag}  \n"
-                    f"Skills: {', '.join(c['skills'])}  \n"
-                    f"Fatigue: {fatigue_color} {fatigue}/100"
-                )
+                _render_consultant_card(c, fatigue, sick, departed)
 
     with right:
         with ui.card("Active projects"):
@@ -296,24 +395,7 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
                 st.info("No active projects this week.")
             for p in visible_projects:
                 ps = state["projects"][p["id"]]
-                tier_emoji = {"A": "\U0001F534", "B": "\U0001F7E1", "C": "\u26AA"}.get(p.get("priority_tier"), "\u26AA")
-                urgent_tag = " \U0001F6A8 URGENT" if p.get("urgent") else ""
-                progress = ps["weeks_staffed_correctly"]
-                duration = p["duration_weeks"]
-                revenue = p.get("revenue", 0)
-                revenue_str = f"\u20ac{revenue:,}" if revenue else "Strategic (no revenue)"
-
-                status_str = ""
-                if ps["status"] == "active":
-                    status_str = f" \u00b7 \u25B6\uFE0F {progress}/{duration} weeks done"
-                elif ps["status"] == "available":
-                    status_str = " \u00b7 \U0001F195 Not started"
-
-                st.markdown(
-                    f"{tier_emoji} **{p['name']}** ({p['id']}){urgent_tag}{status_str}  \n"
-                    f"Skills: {', '.join(p.get('required_skills', []))} \u00b7 Min. seniority: {p.get('min_seniority')}  \n"
-                    f"Burn: \u20ac{p['weekly_burn']:,}/wk \u00b7 Revenue: {revenue_str} \u00b7 Deadline: Week {p.get('deadline_week', total)}"
-                )
+                _render_project_card(p, ps, total)
 
     st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
 
