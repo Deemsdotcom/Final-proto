@@ -108,9 +108,9 @@ def _ensure_state_defaults() -> None:
 # ---------- screens ----------
 
 def _render_intro() -> None:
-    ui.eyebrow("Layer 3 · AI-led interview")
+    ui.eyebrow("Stage 3 of 3 · AI-led interview")
     ui.page_title(
-        "Voice call with an AI recruiter",
+        "Layer 3: Voice call with an AI recruiter",
         subtitle="Four short questions, around sixteen minutes. Speak openly - there are no right or wrong answers.",
     )
 
