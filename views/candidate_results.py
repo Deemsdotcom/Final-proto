@@ -1,27 +1,22 @@
 """Candidate-facing post-submission screen.
 
-The candidate sees a minimal "Thanks for the submission" page - no scores,
-no radar, no LLM-generated feedback. All those things are still computed
-and saved to the database for the recruiter dashboard; they're just not
-surfaced to the candidate.
+Shows the candidate their results: overall + per-layer metrics, a bar
+chart of the three layers, a competency radar, and AI-generated
+developmental feedback. Top Fit classification and per-question / per-
+week / per-transcript drill-downs are hidden - those are recruiter-only.
 
-We split the persistence work in two:
-
-1. _save_base_scores_fast: pure number-crunching off the existing DB
-   rows. No LLM calls. Runs synchronously while the candidate is shown
-   a one-line spinner. Takes well under a second on any normal load.
-
-2. _generate_llm_summaries_lazy: the two LLM calls
-   (generate_candidate_feedback + generate_recruiter_summary) needed for
-   the recruiter dashboard. They run AFTER the thank-you screen has
-   rendered, so the candidate isn't blocked. If they fail or are slow,
-   the candidate has already moved on. The recruiter dashboard handles
-   missing summaries gracefully and can also regenerate them on demand.
+Performance: base numeric scores (overall, layers, competencies) are
+computed and saved synchronously in well under a second, so the
+candidate sees their scores and charts immediately. The AI-generated
+feedback runs after the page has already rendered, displayed below
+the charts with a small spinner while it loads. The candidate is
+NOT blocked waiting for the LLM call.
 """
 
 from __future__ import annotations
 
 import streamlit as st
+import plotly.graph_objects as go
 
 from assessment_logic.layer1_logic import aggregate_layer1
 from assessment_logic.layer2_logic import aggregate_layer2
@@ -35,26 +30,37 @@ from . import _design as ui
 def render() -> None:
     candidate_id = st.session_state.candidate_id
 
-    # Fast path: compute and save the numeric scores synchronously. This
-    # is what unblocks the recruiter dashboard right away. No LLM calls
-    # here, so we're talking sub-second.
+    # Fast path: compute and save the numeric scores synchronously.
+    # Sub-second, no LLM calls. This is what makes the candidate's
+    # scores + charts available right away below.
     existing = db.get_final_score(candidate_id)
     if not existing and not st.session_state.get("final_result_computed"):
         with st.spinner("Saving your responses..."):
             _save_base_scores_fast(candidate_id)
         st.session_state.final_result_computed = True
+        existing = db.get_final_score(candidate_id)
 
-    # Render the thank-you screen right now so the candidate isn't waiting.
-    _render_thank_you()
+    if not existing:
+        ui.inject_global_styles()
+        ui.header()
+        st.error(
+            "We couldn't load your results. Please reach out to the "
+            "recruitment team - your responses are still safely stored."
+        )
+        return
 
-    # Deferred LLM summaries. Runs AFTER the thank-you screen has
-    # appeared. Wrapped in try/except so a slow or failed call never
-    # bubbles up into the candidate UI. Caches via session_state so we
-    # only attempt it once per session.
+    _render_candidate_view(existing)
+
+    # Deferred LLM summary (recruiter-facing). Runs AFTER the candidate
+    # view has rendered so it never blocks the candidate.
     if not st.session_state.get("l3_llm_summaries_attempted"):
         st.session_state.l3_llm_summaries_attempted = True
         _generate_llm_summaries_lazy(candidate_id)
 
+
+# ============================================================
+# Fast scoring + persistence
+# ============================================================
 
 def _save_base_scores_fast(candidate_id: str) -> None:
     """Compute base scores from the persisted DB rows and save them. Fast.
@@ -62,10 +68,12 @@ def _save_base_scores_fast(candidate_id: str) -> None:
     No LLM calls. The recruiter_summary and candidate_feedback fields are
     seeded with empty strings here so the row exists and the recruiter
     dashboard can read it immediately. The feedback strings get
-    backfilled later by _generate_llm_summaries_lazy (or by the
-    recruiter dashboard on demand if that backfill fails).
+    backfilled later by _generate_llm_summaries_lazy and (on the
+    candidate side) by _render_developmental_feedback.
     """
-    # Layer 1: recompute from DB in case session state is stale.
+    import sys
+
+    # Layer 1: recompute from DB.
     l1_rows = db.get_layer1_results(candidate_id)
     theme_totals = {"logical": [0, 0], "numerical": [0, 0], "verbal": [0, 0]}
     for r in l1_rows:
@@ -100,7 +108,7 @@ def _save_base_scores_fast(candidate_id: str) -> None:
     ]
     layer3, l3_comp = aggregate_layer3(competency_scores)
 
-    # AI-use flags from session state (set by Layer 1 finish and Layer 2 finalize).
+    # AI-use flags from session state.
     ai_flags = {
         "ai_flag_logical":   int(bool(st.session_state.get("l1_ai_flag_logical", False))),
         "ai_flag_numerical": int(bool(st.session_state.get("l1_ai_flag_numerical", False))),
@@ -108,17 +116,41 @@ def _save_base_scores_fast(candidate_id: str) -> None:
         "ai_flag_layer2":    int(bool(st.session_state.get("l2_ai_flag", False))),
     }
 
-    # Forward the "I have technical issues" skip from session_state if the
-    # candidate hit the escape on the Layer 3 in-call screen. The reason
-    # text is shown verbatim in the recruiter dashboard.
+    # Tech-issue skip on Layer 3.
     skip_reason = st.session_state.get("l3_skip_reason") or ""
+
+    # ---- DIAGNOSTIC LOGGING ----
+    # If a candidate ends up with 0 on every layer despite their
+    # current_stage having advanced, something silently dropped data
+    # (typical causes: a redeploy mid-flow that wiped session state,
+    # an aggressive resume_from_db that nuked layer rows, the nav
+    # bar being used to jump past layers). Log loudly to stderr so
+    # we can spot the next occurrence.
+    print(
+        "[final_scores] candidate=" + str(candidate_id)[:8]
+        + " l1_rows=" + str(len(l1_rows))
+        + " l2_sim=" + ("yes" if l2_sim else "no")
+        + " l3_rows=" + str(len(l3_rows))
+        + " -> layer1=" + str(round(layer1, 1))
+        + " layer2=" + str(round(layer2, 1))
+        + " layer3=" + str(round(layer3, 1))
+        + " skip=" + ("yes" if skip_reason else "no"),
+        file=sys.stderr,
+    )
+    if layer1 == 0 and layer2 == 0 and layer3 == 0 and not skip_reason:
+        print(
+            "[final_scores] WARNING: candidate=" + str(candidate_id)[:8]
+            + " saved with zero on every layer. Likely cause: data "
+            + "wiped by mid-flow redeploy or resume_from_db. Investigate.",
+            file=sys.stderr,
+        )
 
     draft = assemble_final_scores(
         candidate_id=candidate_id,
         layer1=layer1, layer2=layer2, layer3=layer3,
         l1_comp=l1_comp, l2_comp=l2_comp, l3_comp=l3_comp,
-        candidate_feedback="",  # filled later by lazy LLM path
-        recruiter_summary="",   # filled later by lazy LLM path
+        candidate_feedback="",
+        recruiter_summary="",
         ai_flags=ai_flags,
         layer3_skipped=bool(skip_reason),
         layer3_skip_reason=skip_reason,
@@ -128,22 +160,13 @@ def _save_base_scores_fast(candidate_id: str) -> None:
 
 
 def _generate_llm_summaries_lazy(candidate_id: str) -> None:
-    """Best-effort LLM generation that runs after the thank-you screen.
-
-    Runs synchronously but only AFTER the thank-you UI has rendered, so
-    the candidate sees the confirmation immediately. If it fails or is
-    slow, the candidate is already done. The recruiter dashboard reads
-    these fields and degrades gracefully if they're empty.
-    """
+    """Best-effort LLM generation that runs after the candidate page renders."""
     try:
         existing = db.get_final_score(candidate_id)
         if not existing:
             return
         if existing.get("candidate_feedback") and existing.get("recruiter_summary"):
-            # Already generated (likely a re-render of the results page).
             return
-        # Import lazily so the candidate page isn't held back by import
-        # cost on the fast path.
         from assessment_logic.feedback_generator import (
             generate_candidate_feedback,
             generate_recruiter_summary,
@@ -166,30 +189,179 @@ def _generate_llm_summaries_lazy(candidate_id: str) -> None:
             row["recruiter_summary"] = rs or row.get("recruiter_summary") or ""
             db.save_final_score(row)
     except Exception:
-        # Never let this path bubble up into the candidate UI.
         pass
 
 
-def _render_thank_you() -> None:
-    """The only thing the candidate ever sees on this screen."""
+# ============================================================
+# Candidate-facing UI (per the slide spec)
+# ============================================================
+
+def _render_candidate_view(scores: dict) -> None:
     ui.inject_global_styles()
     ui.header(meta=f"Candidate {st.session_state.candidate_name}")
 
     first_name = (st.session_state.candidate_name or "").split()[0] if st.session_state.candidate_name else ""
     subtitle = (
-        f"Thanks for completing the assessment, {first_name}. "
-        "A member of the recruitment team will be in touch with next steps."
-    ) if first_name else (
-        "Thanks for completing the assessment. "
-        "A member of the recruitment team will be in touch with next steps."
+        f"Thanks for completing the assessment, {first_name}. Here is how it went."
+    ) if first_name else "Thanks for completing the assessment. Here is how it went."
+
+    ui.eyebrow("Assessment complete")
+    ui.page_title("Your assessment results", subtitle)
+
+    # ── Score metrics ────────────────────────────────────────────────
+    skipped = bool(scores.get("layer3_skipped"))
+    cols = st.columns(4)
+    cols[0].metric("Overall", f"{(scores.get('overall_score') or 0):.0f}")
+    cols[1].metric("Layer 1 (Cognitive)", f"{(scores.get('layer1_score') or 0):.0f}")
+    cols[2].metric("Layer 2 (Simulation)", f"{(scores.get('layer2_score') or 0):.0f}")
+    if skipped:
+        cols[3].metric("Layer 3 (Interview)", "SKIPPED", delta="tech issues", delta_color="off")
+    else:
+        cols[3].metric("Layer 3 (Interview)", f"{(scores.get('layer3_score') or 0):.0f}")
+
+    if skipped:
+        ui.info_banner(
+            "Layer 3 was skipped at your request due to technical issues. "
+            "A member of the recruitment team will follow up.",
+            icon="i",
+        )
+
+    st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
+
+    # ── Bar chart: three layer scores ────────────────────────────────
+    with ui.card("Layer breakdown"):
+        bar = go.Figure()
+        bar_x = ["Layer 1 (Cognitive)", "Layer 2 (Simulation)", "Layer 3 (Interview)"]
+        l3_val = 0 if skipped else float(scores.get("layer3_score") or 0)
+        bar_y = [
+            float(scores.get("layer1_score") or 0),
+            float(scores.get("layer2_score") or 0),
+            l3_val,
+        ]
+        bar.add_trace(go.Bar(
+            x=bar_x,
+            y=bar_y,
+            marker_color=["#0058AB", "#1DB8F2", "#00D5D0"],
+            text=[f"{v:.0f}" for v in bar_y],
+            textposition="auto",
+        ))
+        bar.update_layout(
+            yaxis_range=[0, 100],
+            yaxis_title="Score (0-100)",
+            height=320,
+            margin=dict(t=20, b=20, l=20, r=20),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#cbd5e1"),
+        )
+        st.plotly_chart(bar, use_container_width=True)
+
+    # ── Competency radar ─────────────────────────────────────────────
+    with ui.card("Competency profile"):
+        # Mirror the recruiter dashboard's dimensions so the candidate
+        # sees the same competency space (just without the Top Fit flag
+        # and the drill-downs).
+        comp_labels = [
+            "Analytical", "Numerical", "Verbal",
+            "Strategic", "Adaptability (sim)",
+            "Growth mindset", "Adaptability (interview)",
+            "Collaboration", "Self-reflection",
+        ]
+        legacy_growth = (
+            scores.get("competency_l3_proactivity")
+            or scores.get("competency_l3_learning_mindset")
+            or 0
+        )
+        growth_val = (
+            scores.get("competency_l3_growth_mindset")
+            or scores.get("competency_l3_growth_driven_mindset")
+            or legacy_growth
+            or 0
+        )
+        comp_values = [
+            float(scores.get("competency_analytical") or 0),
+            float(scores.get("competency_numerical") or 0),
+            float(scores.get("competency_verbal") or 0),
+            float(scores.get("competency_strategic") or 0),
+            float(scores.get("competency_adaptability") or 0),
+            float(growth_val),
+            float(scores.get("competency_l3_adaptability") or 0),
+            float(scores.get("competency_l3_collaboration") or 0),
+            float(scores.get("competency_l3_self_reflection") or 0),
+        ]
+        radar = go.Figure()
+        radar.add_trace(go.Scatterpolar(
+            r=comp_values + [comp_values[0]],
+            theta=comp_labels + [comp_labels[0]],
+            fill="toself",
+            line_color="#1DB8F2",
+            fillcolor="rgba(29,184,242,0.25)",
+            name="You",
+        ))
+        radar.update_layout(
+            polar=dict(
+                bgcolor="rgba(0,0,0,0)",
+                radialaxis=dict(range=[0, 100], visible=True, gridcolor="#28387A"),
+                angularaxis=dict(gridcolor="#28387A"),
+            ),
+            showlegend=False,
+            height=420,
+            margin=dict(t=30, b=20, l=40, r=40),
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#cbd5e1"),
+        )
+        st.plotly_chart(radar, use_container_width=True)
+
+    # ── Developmental feedback ───────────────────────────────────────
+    _render_developmental_feedback(scores)
+
+    # ── Footer ───────────────────────────────────────────────────────
+    st.markdown("<div style='height:0.8rem'></div>", unsafe_allow_html=True)
+    ui.info_banner(
+        "Your results have been recorded. A member of the recruitment team "
+        "will be in touch about next steps.",
+        icon="i",
     )
 
-    ui.eyebrow("Submission received")
-    ui.page_title("You're done.", subtitle)
 
-    with ui.card("What happens next"):
-        st.markdown(
-            "Your responses have been recorded across all three layers - cognitive, "
-            "simulation, and interview. A recruiter will review them and contact you "
-            "directly about the next steps. You can close this page now."
-        )
+def _render_developmental_feedback(scores: dict) -> None:
+    """Render the AI-generated developmental feedback section.
+
+    If feedback is already cached on the row, render it immediately.
+    If not, generate it now with a small spinner so the candidate sees
+    a clear loading state for just this section (other sections above
+    have already rendered, so there's no global wait).
+    """
+    with ui.card("Your developmental feedback"):
+        cf = (scores.get("candidate_feedback") or "").strip()
+        if not cf:
+            with st.spinner("Preparing your personalised feedback..."):
+                try:
+                    from assessment_logic.feedback_generator import (
+                        _strip_code_fences,
+                        generate_candidate_feedback,
+                    )
+                    cf = generate_candidate_feedback(dict(scores))
+                    # Cache it back so a refresh doesn't regenerate.
+                    if cf:
+                        row = dict(scores)
+                        row["candidate_feedback"] = cf
+                        try:
+                            db.save_final_score(row)
+                        except Exception:
+                            pass
+                except Exception:
+                    cf = (
+                        "We couldn't generate your developmental feedback "
+                        "right now. Your scores above are still your full "
+                        "result; a member of the recruitment team will "
+                        "follow up directly."
+                    )
+        # Strip any leading/trailing ```markdown ... ``` the LLM may have
+        # wrapped the answer in.
+        try:
+            from assessment_logic.feedback_generator import _strip_code_fences
+            cf = _strip_code_fences(cf)
+        except Exception:
+            pass
+        st.markdown(cf or "_(feedback unavailable)_")
