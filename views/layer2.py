@@ -32,6 +32,7 @@ from assessment_logic.layer2_logic import (
 )
 from database import db
 
+from . import _design as ui
 from .state import advance_stage
 
 
@@ -72,68 +73,93 @@ def render() -> None:
 
 
 def _intro() -> None:
-    st.title("Layer 2: Firm Simulation")
-    st.markdown(
-        """
-        ### The setup
-        You're the resource lead at a consulting firm with **6 consultants** and a starting
-        cash balance of **€500,000**. Over the next **8 simulated weeks**, you'll decide
-        who works on which project, respond to events, and try to keep the firm in good
-        shape, both financially and reputationally.
+    """Layer 2 intro - redesigned with our card system.
 
-        Each week you'll see your firm dashboard, the active project board, and your
-        consultants' current state. You assign people to projects, then click
-        **Advance to next week**. Time, cash, fatigue, and reputation all carry forward.
+    Every sentence, bullet, and bold marker is byte-for-byte identical
+    to the previous single-st.markdown version. Only the visual
+    container changes: each section heading becomes a ui.card title,
+    and 'How you're judged' uses a 2-column split so Outcomes (70%)
+    and Process (30%) sit side by side instead of stacked.
+    """
+    ui.inject_global_styles()
+    ui.header(meta=f"Candidate {st.session_state.candidate_name}")
 
-        ### How you're judged
-        Your performance is scored on two things: outcomes (70%) and process (30%).
+    ui.page_title("Layer 2: Firm Simulation")
 
-        **Outcomes (what you actually achieved):**
-        - **Cash management**: did you protect the firm's money or burn through it?
-          Holding cash flat earns partial credit; growing it earns full marks.
-        - **Reputation**: starts at 60. Holding it steady is solid; gaining
-          reputation is excellent. Losing it through cancellations and missed deadlines
-          will cost you.
-        - **Project completions**: projects only count if they finish properly.
-          Quality failures and missed deadlines don't count.
-        - **Consultant fatigue**: keeping the team from burning out matters.
+    with ui.card("The setup"):
+        st.markdown(
+            "You're the resource lead at a consulting firm with **6 consultants** and a starting "
+            "cash balance of **€500,000**. Over the next **8 simulated weeks**, you'll decide "
+            "who works on which project, respond to events, and try to keep the firm in good "
+            "shape, both financially and reputationally."
+        )
+        st.markdown(
+            "Each week you'll see your firm dashboard, the active project board, and your "
+            "consultants' current state. You assign people to projects, then click "
+            "**Advance to next week**. Time, cash, fatigue, and reputation all carry forward."
+        )
 
-        **Process (how well you ran it):**
-        - **Constraint compliance**: did you respect skill and seniority requirements?
-        - **Skill match quality**: staffing the wrong people on a project lowers
-          its quality multiplier and shrinks the revenue when it completes.
+    with ui.card("How you're judged"):
+        st.markdown(
+            "Your performance is scored on two things: outcomes (70%) and process (30%)."
+        )
+        c_out, c_proc = st.columns(2, gap="medium")
+        with c_out:
+            st.markdown("**Outcomes (what you actually achieved):**")
+            st.markdown(
+                "- **Cash management**: did you protect the firm's money or burn through it? "
+                "Holding cash flat earns partial credit; growing it earns full marks.\n"
+                "- **Reputation**: starts at 60. Holding it steady is solid; gaining "
+                "reputation is excellent. Losing it through cancellations and missed deadlines "
+                "will cost you.\n"
+                "- **Project completions**: projects only count if they finish properly. "
+                "Quality failures and missed deadlines don't count.\n"
+                "- **Consultant fatigue**: keeping the team from burning out matters."
+            )
+        with c_proc:
+            st.markdown("**Process (how well you ran it):**")
+            st.markdown(
+                "- **Constraint compliance**: did you respect skill and seniority requirements?\n"
+                "- **Skill match quality**: staffing the wrong people on a project lowers "
+                "its quality multiplier and shrinks the revenue when it completes."
+            )
 
-        ### What to prioritize
-        - **Match skills and seniority before anything else.** A skill mismatch
-          cuts that project's quality to 55%. A seniority mismatch cuts it to 65%.
-          These stack. A badly-staffed project pays a fraction of its revenue.
-        - **Use the smallest viable team.** Adding more people doesn't speed projects
-          up or improve quality past 100%. Extra bodies just leave other projects
-          unstaffed.
-        - **Don't let projects sit idle.** Two consecutive unstaffed weeks
-          and the project gets cancelled with a -15 reputation hit.
-        - **Watch deadlines.** Missing one costs -8 reputation and the project pays nothing.
-        - **Plan around fatigue.** A consultant staffed every week hits high fatigue
-          (≥70) and starts dragging quality down. Rotate the bench.
+    with ui.card("What to prioritize"):
+        st.markdown(
+            "- **Match skills and seniority before anything else.** A skill mismatch "
+            "cuts that project's quality to 55%. A seniority mismatch cuts it to 65%. "
+            "These stack. A badly-staffed project pays a fraction of its revenue.\n"
+            "- **Use the smallest viable team.** Adding more people doesn't speed projects "
+            "up or improve quality past 100%. Extra bodies just leave other projects "
+            "unstaffed.\n"
+            "- **Don't let projects sit idle.** Two consecutive unstaffed weeks "
+            "and the project gets cancelled with a -15 reputation hit.\n"
+            "- **Watch deadlines.** Missing one costs -8 reputation and the project pays nothing.\n"
+            "- **Plan around fatigue.** A consultant staffed every week hits high fatigue "
+            "(≥70) and starts dragging quality down. Rotate the bench."
+        )
 
-        ### What to look out for
-        - **Two binding decisions** will interrupt the game. You can't advance until
-          you choose. Read the options carefully because they have lasting effects on
-          cash, reputation, and your team.
-        - **Sick leave, budget cuts, and new project arrivals** will happen mid-game.
-          You'll need to adapt your staffing on the fly.
-        - **New projects arrive in later weeks.** Some have very short windows
-          (a 2-week project arriving in week 7, for example). You may need to
-          free people up to chase them.
+    with ui.card("What to look out for"):
+        st.markdown(
+            "- **Two binding decisions** will interrupt the game. You can't advance until "
+            "you choose. Read the options carefully because they have lasting effects on "
+            "cash, reputation, and your team.\n"
+            "- **Sick leave, budget cuts, and new project arrivals** will happen mid-game. "
+            "You'll need to adapt your staffing on the fly.\n"
+            "- **New projects arrive in later weeks.** Some have very short windows "
+            "(a 2-week project arriving in week 7, for example). You may need to "
+            "free people up to chase them."
+        )
 
-        ### The clock
-        You have **20 minutes total** to play through all 8 weeks. The timer runs
-        continuously. There's no per-week limit. If time runs out, remaining weeks
-        auto-advance with no new staffing, which usually goes badly.
-
-        Think long. A decision in Week 2 will shape what's possible in Week 6.
-        """
-    )
+    with ui.card("The clock"):
+        st.markdown(
+            "You have **20 minutes total** to play through all 8 weeks. The timer runs "
+            "continuously. There's no per-week limit. If time runs out, remaining weeks "
+            "auto-advance with no new staffing, which usually goes badly."
+        )
+        st.markdown(
+            "Think long. A decision in Week 2 will shape what's possible in Week 6."
+        )
 
     if st.button("Begin Layer 2", type="primary", use_container_width=True):
         st.session_state.l2_started = True
