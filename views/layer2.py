@@ -387,6 +387,31 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
         if _choice_id == "accelerate":
             effective_departed.add(_did)
 
+    # Prune any consultant in effective_departed from existing widget
+    # state and from the carried-forward assignments dict. Without this
+    # step, a consultant who was already assigned to a project before
+    # the candidate picked Accelerate would still show as selected in
+    # that project's multiselect on this re-render (Streamlit uses
+    # session_state[widget_key] as the source of truth and ignores the
+    # filtered options list for already-selected values).
+    _visible_projects_cache = projects_visible_in_week(scenario, state, week)
+    if effective_departed:
+        _assignments_key = f"l2_week_{week}_assignments"
+        if _assignments_key in st.session_state:
+            _carried = st.session_state[_assignments_key]
+            for _pid in list(_carried.keys()):
+                _carried[_pid] = [
+                    _c for _c in (_carried.get(_pid) or [])
+                    if _c not in effective_departed
+                ]
+        for _project in _visible_projects_cache:
+            _wk = f"l2_assign_w{week}_{_project['id']}"
+            if _wk in st.session_state:
+                st.session_state[_wk] = [
+                    _c for _c in (st.session_state[_wk] or [])
+                    if _c not in effective_departed
+                ]
+
     # ── Two-column main view: consultants + projects ─────────────────
     left, right = st.columns([1, 1], gap="medium")
 
