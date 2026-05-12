@@ -461,8 +461,51 @@ _GLOBAL_CSS = f"""
     border-radius: 2px;
 }}
 
-/* ── Radio / Checkbox ────────────────────────────────────────────────────── */
-.stApp [data-testid="stRadio"] label {{ color: {TEXT_PRIMARY}; }}
+/* ── Radio / Checkbox ──────────────────────────────────────────────────────
+   Style each radio option inside a stRadio widget as a clickable choice
+   card. The native input + label structure stays intact (Streamlit keeps
+   driving selection), only the visual container around each label changes.
+   Applies to the Layer 1 questions, the Layer 1 verbal example preview,
+   and the Layer 2 decision + trade-off modals.                              */
+.stApp [data-testid="stRadio"] > label {{ color: {TEXT_PRIMARY}; }}
+
+.stApp [data-testid="stRadio"] [role="radiogroup"] {{
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}}
+.stApp [data-testid="stRadio"] [role="radiogroup"] > label {{
+    background: rgba(0,0,0,0.22);
+    border: 1px solid {NAVY_BORDER};
+    border-radius: 6px;
+    padding: 0.65rem 1rem 0.65rem 0.85rem;
+    margin: 0 !important;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    cursor: pointer;
+    align-items: flex-start;
+}}
+.stApp [data-testid="stRadio"] [role="radiogroup"] > label:hover {{
+    background: rgba(29,184,242,0.08);
+    border-color: rgba(29,184,242,0.42);
+}}
+.stApp [data-testid="stRadio"] [role="radiogroup"] > label[data-checked="true"],
+.stApp [data-testid="stRadio"] [role="radiogroup"] > label:has(input:checked) {{
+    background: rgba(29,184,242,0.14);
+    border-color: {BLUE_CYAN};
+    box-shadow: 0 0 0 1px rgba(29,184,242,0.35);
+}}
+.stApp [data-testid="stRadio"] [role="radiogroup"] > label > div:first-child {{
+    margin-top: 0.18rem;
+}}
+.stApp [data-testid="stRadio"] [role="radiogroup"] > label p {{
+    color: {TEXT_PRIMARY};
+    font-size: 0.96rem;
+    line-height: 1.4;
+}}
+.stApp [data-testid="stRadio"] [role="radiogroup"] > label p strong {{
+    color: {BLUE_CYAN};
+    font-weight: 700;
+}}
 
 /* ── Card paragraph · equalise heights across sibling cards ─────────────── */
 .cap-card p {{
