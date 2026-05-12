@@ -171,19 +171,16 @@ THEME_LABELS = {
             "False, or Cannot Say based only on what the passage says. Outside "
             "knowledge does not count."
         ),
-        "pattern_tags": [
-            "True", "False", "Cannot Say",
-            "Passage logic", "No outside knowledge",
-        ],
+        "pattern_tags": ["True", "False", "Cannot Say"],
         "look_for_note": (
             "If the passage doesn't address the statement directly, the answer "
             "is almost always Cannot Say. Don't read in what isn't there."
         ),
         "tips": [
-            ("Stick to the passage.", "Use only what's written. No assumptions about what 'should' be true."),
-            ("Beware of paraphrase traps.", "A statement can use different words and still mean exactly what the passage says."),
-            ("Default to Cannot Say.", "When the passage is silent on a point, the answer is Cannot Say, not False."),
-            ("Watch the timer.", "Don't get stuck on one passage."),
+            ("Stick to the passage.",
+             " Use only what's written. No assumptions about what 'should' be true."),
+            ("Default to Cannot Say.",
+             " When the passage is silent on a point, the answer is most often Cannot Say."),
         ],
     },
 }
