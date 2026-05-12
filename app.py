@@ -31,67 +31,129 @@ THEMES = ["logical", "numerical", "verbal"]
 
 
 # ── Top nav bar (prototype-mode) ──────────────────────────────────────────
-# Always-visible navigation strip rendered at the very top of every page.
-# Each button jumps directly to that stage. Designed for prototype testing
-# so the team can hop around without clicking through the full flow each
-# time. Strip this function (or wrap it back in a ?dev=1 gate) before
-# shipping the assessment to real candidates.
+# Compact dev/QA nav strip rendered above every page. Designed for
+# prototype testing so the team can hop between stages without clicking
+# through the full candidate flow. Strip this function (or wrap it back
+# in a ?dev=1 gate) before shipping the assessment to real candidates.
 
-def _nav_bar() -> None:
-    # Brand-aligned styling: dark navy strip with cyan accents matching
-    # the rest of the app. Sits ABOVE the page header that each view
-    # renders, so it's always the first thing on screen.
+def _inject_dev_nav_styles() -> None:
+    """Inject scoped CSS for the dev nav popover. Selectors target
+    Streamlit's stPopover / stPopoverBody data-testids so the rest of
+    the app's button styling is untouched."""
     st.markdown(
         """
         <style>
-        .cap-nav-bar {
-            background: #15233E;
-            border: 1px solid #28387A;
-            border-radius: 8px;
-            padding: 0.4rem 0.6rem;
-            margin: 0 0 1rem 0;
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            font-family: Ubuntu, sans-serif;
+        /* Popover trigger: small, dev-tool styled, cyan accent */
+        .stApp div[data-testid="stPopover"] > div > button {
+            padding: 0.28rem 0.65rem !important;
+            font-size: 0.72rem !important;
+            font-weight: 700 !important;
+            letter-spacing: 0.18em !important;
+            text-transform: uppercase !important;
+            font-family: Ubuntu, sans-serif !important;
+            background: rgba(29,184,242,0.06) !important;
+            border: 1px solid rgba(29,184,242,0.35) !important;
+            color: #1DB8F2 !important;
+            border-radius: 4px !important;
+            min-height: 0 !important;
+            line-height: 1.4 !important;
+            box-shadow: none !important;
         }
-        .cap-nav-label {
-            color: #1DB8F2;
-            font-size: 0.78rem;
-            font-weight: 700;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
-            margin-right: 0.5rem;
-            white-space: nowrap;
+        .stApp div[data-testid="stPopover"] > div > button:hover {
+            background: rgba(29,184,242,0.14) !important;
+            border-color: #1DB8F2 !important;
+            color: #1DB8F2 !important;
         }
-        /* Make the nav buttons themselves compact */
-        .cap-nav-row .stButton > button {
-            width: 100%;
-            padding: 0.4rem 0.5rem !important;
-            font-size: 0.85rem !important;
-            font-weight: 600 !important;
-            min-height: auto !important;
+        /* Popover panel surface */
+        .stApp div[data-testid="stPopoverBody"] {
+            background: #15233E !important;
+            border: 1px solid #28387A !important;
             border-radius: 6px !important;
+            min-width: 580px !important;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.45) !important;
+        }
+        /* Compact secondary buttons inside the popover */
+        .stApp div[data-testid="stPopoverBody"] .stButton > button[kind="secondary"] {
+            padding: 0.3rem 0.4rem !important;
+            font-size: 0.74rem !important;
+            font-weight: 600 !important;
+            font-family: Ubuntu, sans-serif !important;
+            min-height: 0 !important;
+            line-height: 1.25 !important;
+            border-radius: 4px !important;
+            background: #1A2548 !important;
+            border: 1px solid #28387A !important;
+            color: #C5D1E8 !important;
+            box-shadow: none !important;
+            letter-spacing: 0.02em !important;
+        }
+        .stApp div[data-testid="stPopoverBody"] .stButton > button[kind="secondary"]:hover {
+            background: #1E2D55 !important;
+            border-color: #1DB8F2 !important;
+            color: #FFFFFF !important;
+        }
+        /* Primary button (e.g. Create test candidate) inside popover */
+        .stApp div[data-testid="stPopoverBody"] .stButton > button[kind="primary"] {
+            padding: 0.4rem 0.7rem !important;
+            font-size: 0.78rem !important;
+            min-height: 0 !important;
+            border-radius: 4px !important;
+            box-shadow: none !important;
+        }
+        /* Tiny eyebrow rows inside the popover */
+        .cap-dev-section {
+            color: #1DB8F2;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            margin: 0.55rem 0 0.3rem 0;
+        }
+        /* Status pill at the top of the popover */
+        .cap-dev-stage-pill {
+            display: inline-block;
+            padding: 0.2rem 0.55rem;
+            border: 1px solid #28387A;
+            border-radius: 4px;
+            background: #1A2548;
+            color: #C5D1E8;
+            font-size: 0.72rem;
+            letter-spacing: 0.02em;
+            font-family: ui-monospace, Menlo, monospace;
+            margin: 0.1rem 0 0.4rem 0;
+        }
+        .cap-dev-stage-pill strong {
+            color: #1DB8F2;
+            font-weight: 700;
+            letter-spacing: 0.04em;
         }
         </style>
-        <div class="cap-nav-bar">
-            <span class="cap-nav-label">Quick nav</span>
-        </div>
         """,
         unsafe_allow_html=True,
     )
 
-    # ── Test candidate setup row (only when no candidate yet) ────────────
-    if not st.session_state.get("candidate_id"):
-        c1, c2 = st.columns([3, 1])
-        with c1:
+
+def _nav_bar() -> None:
+    _inject_dev_nav_styles()
+
+    has_candidate = bool(st.session_state.get("candidate_id"))
+    stage = st.session_state.get("stage", "-") if has_candidate else "no candidate"
+    trigger = f"⚙ Dev nav · {stage}"
+
+    with st.popover(trigger, use_container_width=False):
+        # No candidate yet: setup affordance only.
+        if not has_candidate:
+            st.markdown(
+                '<div class="cap-dev-section">Test candidate</div>',
+                unsafe_allow_html=True,
+            )
             st.caption(
                 "No candidate yet · create a test one to enable stage jumps."
             )
-        with c2:
             if st.button(
                 "Create test candidate",
-                use_container_width=True, key="nav_make_candidate",
+                use_container_width=True,
+                key="nav_make_candidate",
                 type="primary",
             ):
                 cid = str(uuid.uuid4())
@@ -104,42 +166,56 @@ def _nav_bar() -> None:
                 st.session_state.candidate_email = f"dev+{cid[:8]}@test.local"
                 st.session_state.stage = "intro"
                 st.rerun()
-        st.markdown("---")
-        return  # no point rendering the rest until a candidate exists
+            return
 
-    # ── Main page-jump row ───────────────────────────────────────────────
-    st.markdown('<div class="cap-nav-row">', unsafe_allow_html=True)
-    cols = st.columns(8)
-    pages = [
-        ("Landing",         "landing"),
-        ("Intro",           "intro"),
-        ("Layer 1",         "layer1"),
-        ("Layer 2",         "layer2"),
-        ("Layer 3",         "layer3"),
-        ("Results",         "results"),
-        ("Recruiter",       "recruiter"),
-        ("Reset",           "reset"),
-    ]
-    for i, (label, target) in enumerate(pages):
-        with cols[i]:
-            if st.button(label, key=f"nav_{target}", use_container_width=True):
-                _jump_to(target)
-    st.markdown("</div>", unsafe_allow_html=True)
+        # Active candidate: status pill + page jumps + Layer 1 sub-jumps.
+        cname = st.session_state.get("candidate_name", "")
+        st.markdown(
+            f'<div class="cap-dev-stage-pill">'
+            f'candidate · {cname} · stage: <strong>{stage}</strong>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
-    # ── Layer 1 sub-jumps (themes) ───────────────────────────────────────
-    st.caption("Layer 1 themes")
-    cols = st.columns(6)
-    sub_pages = []
-    for theme in THEMES:
-        sub_pages.append((f"{theme.title()} intro", theme, "intro"))
-        sub_pages.append((f"{theme.title()} Q1",    theme, "q1"))
-    for i, (label, theme, kind) in enumerate(sub_pages):
-        with cols[i]:
-            if st.button(
-                label, key=f"nav_l1_{theme}_{kind}", use_container_width=True,
-            ):
-                _jump_layer1(theme, kind)
-    st.markdown("---")
+        st.markdown(
+            '<div class="cap-dev-section">Page jumps</div>',
+            unsafe_allow_html=True,
+        )
+        pages = [
+            ("Landing",   "landing"),
+            ("Intro",     "intro"),
+            ("Layer 1",   "layer1"),
+            ("Layer 2",   "layer2"),
+            ("Layer 3",   "layer3"),
+            ("Results",   "results"),
+            ("Recruiter", "recruiter"),
+            ("Reset",     "reset"),
+        ]
+        cols = st.columns(len(pages))
+        for i, (label, target) in enumerate(pages):
+            with cols[i]:
+                if st.button(
+                    label, key=f"nav_{target}", use_container_width=True,
+                ):
+                    _jump_to(target)
+
+        st.markdown(
+            '<div class="cap-dev-section">Layer 1 themes</div>',
+            unsafe_allow_html=True,
+        )
+        sub_pages = []
+        for theme in THEMES:
+            sub_pages.append((f"{theme.title()} intro", theme, "intro"))
+            sub_pages.append((f"{theme.title()} Q1",    theme, "q1"))
+        cols = st.columns(len(sub_pages))
+        for i, (label, theme, kind) in enumerate(sub_pages):
+            with cols[i]:
+                if st.button(
+                    label,
+                    key=f"nav_l1_{theme}_{kind}",
+                    use_container_width=True,
+                ):
+                    _jump_layer1(theme, kind)
 
 
 def _jump_to(target: str) -> None:
