@@ -765,25 +765,48 @@ def _finish_theme(candidate_id: str, theme: str) -> None:
 
 
 def _finish_layer(candidate_id: str) -> None:
-    """All three themes done. Move on to Layer 2 with no score reveal."""
+    """All three themes done. Move on to Layer 2 with no score reveal.
+
+    Two cap-feat blocks stacked (same visual language as the Layer 2
+    intro page): the celebration block on top with the eyebrow + title
+    + subtitle on the left and an inline teal checkmark badge on the
+    right; then the 'Up next' block with the verbatim team v9 teaser.
+    """
     ui.inject_global_styles()
     ui.header(meta=f"Candidate {st.session_state.candidate_name}")
 
-    ui.layer_complete_hero(
-        eyebrow="Stage 1 of 3 complete",
-        title="Layer 1 Complete",
-        subtitle="Nice work, you've finished the cognitive assessment. Your full results will be shown after you complete all three layers.",
+    # Completion celebration block.
+    st.markdown(
+        '''
+<div class="cap-feat" style="margin-bottom:1rem;">
+  <div class="cap-feat-eyebrow">Stage 1 of 3 complete</div>
+  <div style="display:flex;align-items:center;gap:1.5rem;">
+    <div style="flex:1;min-width:0;">
+      <h2 style="margin:0 0 0.55rem 0;color:#FFFFFF;font-size:2.3rem;font-weight:700;line-height:1.1;letter-spacing:-0.005em;font-family:\'Ubuntu\',sans-serif;">Layer 1 Complete</h2>
+      <p class="cap-feat-body" style="margin:0;">Nice work, you\'ve finished the cognitive assessment. Your full results will be shown after you complete all three layers.</p>
+    </div>
+    <div style="flex-shrink:0;width:64px;height:64px;border-radius:50%;background:rgba(0,213,208,0.14);border:2px solid #00D5D0;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 6px rgba(0,213,208,0.06);">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00D5D0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+  </div>
+</div>
+''',
+        unsafe_allow_html=True,
     )
 
-    with ui.card("Up next"):
-        # Team v9 obligatory verbatim copy for the Layer 2 teaser.
-        st.markdown(
-            "**Next: Layer 2 (Firm Simulation)**\n\n"
-            "You'll run a consulting firm for 8 simulated weeks. Assign "
-            "consultants to projects, manage cash and reputation, and "
-            "respond to events as they happen. **20 minutes** in one "
-            "continuous timer."
-        )
+    # Up next block (team v9 verbatim Layer 2 teaser).
+    st.markdown(
+        '''
+<div class="cap-feat" style="margin-bottom:1rem;">
+  <div class="cap-feat-eyebrow">Up next</div>
+  <p class="cap-feat-body"><strong>Next: Layer 2 (Firm Simulation)</strong></p>
+  <p class="cap-feat-body" style="margin-top:0.6rem;">You\'ll run a consulting firm for 8 simulated weeks. Assign consultants to projects, manage cash and reputation, and respond to events as they happen. <strong>20 minutes</strong> in one continuous timer.</p>
+</div>
+''',
+        unsafe_allow_html=True,
+    )
 
     if st.button(
         "Begin Layer 2",
