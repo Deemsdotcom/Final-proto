@@ -73,129 +73,112 @@ def render() -> None:
 
 
 def _intro() -> None:
-    """Layer 2 intro - design-system version (matches Layer 1 overview).
+    """Layer 2 intro - cap-feat block style.
 
-    Every sentence, bullet, bold marker, percentage, currency symbol and
-    emoji is byte-for-byte identical to the team's original copy. Only
-    the visual envelope changes:
-      * cards with eyebrow titles (same pattern as Layer 1 overview)
-      * numbered-rule style for 'What to prioritize' + 'What to look
-        out for' (mirrors the 'Before you begin' prep card on Layer 1)
-      * 2-column split inside 'How you're judged' so Outcomes (70%) and
-        Process (30%) sit side by side
-      * closing tip rendered as an ui.info_banner above the CTA, the
-        same cyan-accented note pattern used on every other page
+    Each section becomes a `cap-feat` block (cyan top stripe, dark navy
+    fill, cyan eyebrow, cyan bold accents) - the same visual element
+    used inside the Layer 1 theme-intro magazine spread. Bullets use
+    the cap-feat-tips numbered counter list. Two-column CSS grid inside
+    'How you're judged' so Outcomes and Process sit side by side.
+
+    Every word, sentence, percentage, currency symbol, bold marker and
+    em-dash is byte-for-byte from the team's original copy. This is
+    purely a visual restructure.
     """
-    import re as _re
-
-    def _md_bold_to_html(text: str) -> str:
-        """Render **bold** as <strong>bold</strong> for use inside our
-        raw-HTML numbered rules (the ui.numbered_rule helper escapes
-        its text param so bold markdown would survive as literal **).
-        """
-        return _re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
-
-    def _rule(num: int, raw_text: str, sev: str = "info") -> None:
-        sev_class = {"info": "sev-info", "warn": "sev-warn", "crit": "sev-crit"}.get(
-            sev, "sev-info"
-        )
-        st.markdown(
-            f'<div class="cap-rule {sev_class}">'
-            f'<span class="num">{num}</span>'
-            f'<span class="text">{_md_bold_to_html(raw_text)}</span>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-
     ui.inject_global_styles()
     ui.header(meta=f"Candidate {st.session_state.candidate_name}")
 
     ui.page_title("Layer 2: Firm Simulation")
 
-    with ui.card("The setup"):
-        st.markdown(
-            "You're the resource lead at a consulting firm with **6 consultants** and a starting "
-            "cash balance of **\u20ac500,000**. Over the next **8 simulated weeks**, you'll decide "
-            "who works on which project, respond to events, and try to keep the firm in good "
-            "shape, both financially and reputationally."
-        )
-        st.markdown(
-            "Each week you'll see your firm dashboard, the active project board, and your "
-            "consultants' current state. You assign people to projects, then click "
-            "**Advance to next week**. Time, cash, fatigue, and reputation all carry forward."
-        )
+    # The setup
+    st.markdown(
+        '''
+<div class="cap-feat" style="margin-bottom:1rem;">
+  <div class="cap-feat-eyebrow">The setup</div>
+  <p class="cap-feat-body">You\'re the resource lead at a consulting firm with <strong>6 consultants</strong> and a starting cash balance of <strong>\u20ac500,000</strong>. Over the next <strong>8 simulated weeks</strong>, you\'ll decide who works on which project, respond to events, and try to keep the firm in good shape, both financially and reputationally.</p>
+  <p class="cap-feat-body" style="margin-top:0.85rem;">Each week you\'ll see your firm dashboard, the active project board, and your consultants\' current state. You assign people to projects, then click <strong>Advance to next week</strong>. Time, cash, fatigue, and reputation all carry forward.</p>
+</div>
+''',
+        unsafe_allow_html=True,
+    )
 
-    with ui.card("How you're judged"):
-        st.markdown(
-            "Your performance is scored on two things: outcomes (70%) and process (30%)."
-        )
-        c_out, c_proc = st.columns(2, gap="medium")
-        with c_out:
-            st.markdown("**Outcomes (what you actually achieved):**")
-            st.markdown(
-                "- **Cash management**: did you protect the firm's money or burn through it? "
-                "Holding cash flat earns partial credit; growing it earns full marks.\n"
-                "- **Reputation**: starts at 60. Holding it steady is solid; gaining "
-                "reputation is excellent. Losing it through cancellations and missed deadlines "
-                "will cost you.\n"
-                "- **Project completions**: projects only count if they finish properly. "
-                "Quality failures and missed deadlines don't count.\n"
-                "- **Consultant fatigue**: keeping the team from burning out matters."
-            )
-        with c_proc:
-            st.markdown("**Process (how well you ran it):**")
-            st.markdown(
-                "- **Constraint compliance**: did you respect skill and seniority requirements?\n"
-                "- **Skill match quality**: staffing the wrong people on a project lowers "
-                "its quality multiplier and shrinks the revenue when it completes."
-            )
+    # How you\'re judged
+    st.markdown(
+        '''
+<div class="cap-feat" style="margin-bottom:1rem;">
+  <div class="cap-feat-eyebrow">How you\'re judged</div>
+  <p class="cap-feat-body">Your performance is scored on two things: outcomes (70%) and process (30%).</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.8rem;margin-top:1.1rem;">
+    <div>
+      <div style="font-weight:700;color:#cbd5e1;margin-bottom:0.5rem;font-size:1.02rem;">Outcomes (what you actually achieved):</div>
+      <ul class="cap-feat-tips">
+        <li><strong>Cash management:</strong> did you protect the firm\'s money or burn through it? Holding cash flat earns partial credit; growing it earns full marks.</li>
+        <li><strong>Reputation:</strong> starts at 60. Holding it steady is solid; gaining reputation is excellent. Losing it through cancellations and missed deadlines will cost you.</li>
+        <li><strong>Project completions:</strong> projects only count if they finish properly. Quality failures and missed deadlines don\'t count.</li>
+        <li><strong>Consultant fatigue:</strong> keeping the team from burning out matters.</li>
+      </ul>
+    </div>
+    <div>
+      <div style="font-weight:700;color:#cbd5e1;margin-bottom:0.5rem;font-size:1.02rem;">Process (how well you ran it):</div>
+      <ul class="cap-feat-tips">
+        <li><strong>Constraint compliance:</strong> did you respect skill and seniority requirements?</li>
+        <li><strong>Skill match quality:</strong> staffing the wrong people on a project lowers its quality multiplier and shrinks the revenue when it completes.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+''',
+        unsafe_allow_html=True,
+    )
 
-    with ui.card("What to prioritize"):
-        _rule(1,
-            "**Match skills and seniority before anything else.** A skill mismatch "
-            "cuts that project's quality to 55%. A seniority mismatch cuts it to 65%. "
-            "These stack. A badly-staffed project pays a fraction of its revenue.")
-        _rule(2,
-            "**Use the smallest viable team.** Adding more people doesn't speed projects "
-            "up or improve quality past 100%. Extra bodies just leave other projects "
-            "unstaffed.")
-        _rule(3,
-            "**Don't let projects sit idle.** Two consecutive unstaffed weeks "
-            "and the project gets cancelled with a -15 reputation hit.")
-        _rule(4,
-            "**Watch deadlines.** Missing one costs -8 reputation and the project pays nothing.")
-        _rule(5,
-            "**Plan around fatigue.** A consultant staffed every week hits high fatigue "
-            "(\u226570) and starts dragging quality down. Rotate the bench.")
+    # What to prioritize
+    st.markdown(
+        '''
+<div class="cap-feat" style="margin-bottom:1rem;">
+  <div class="cap-feat-eyebrow">What to prioritize</div>
+  <ul class="cap-feat-tips">
+    <li><strong>Match skills and seniority before anything else.</strong> A skill mismatch cuts that project\'s quality to 55%. A seniority mismatch cuts it to 65%. These stack. A badly-staffed project pays a fraction of its revenue.</li>
+    <li><strong>Use the smallest viable team.</strong> Adding more people doesn\'t speed projects up or improve quality past 100%. Extra bodies just leave other projects unstaffed.</li>
+    <li><strong>Don\'t let projects sit idle.</strong> Two consecutive unstaffed weeks and the project gets cancelled with a -15 reputation hit.</li>
+    <li><strong>Watch deadlines.</strong> Missing one costs -8 reputation and the project pays nothing.</li>
+    <li><strong>Plan around fatigue.</strong> A consultant staffed every week hits high fatigue (\u226570) and starts dragging quality down. Rotate the bench.</li>
+  </ul>
+</div>
+''',
+        unsafe_allow_html=True,
+    )
 
-    with ui.card("What to look out for"):
-        _rule(1,
-            "**Two binding decisions** will interrupt the game. You can't advance until "
-            "you choose. Read the options carefully because they have lasting effects on "
-            "cash, reputation, and your team.",
-            sev="warn")
-        _rule(2,
-            "**Sick leave, budget cuts, and new project arrivals** will happen mid-game. "
-            "You'll need to adapt your staffing on the fly.",
-            sev="warn")
-        _rule(3,
-            "**New projects arrive in later weeks.** Some have very short windows "
-            "(a 2-week project arriving in week 7, for example). You may need to "
-            "free people up to chase them.",
-            sev="warn")
+    # What to look out for
+    st.markdown(
+        '''
+<div class="cap-feat" style="margin-bottom:1rem;">
+  <div class="cap-feat-eyebrow">What to look out for</div>
+  <ul class="cap-feat-tips">
+    <li><strong>Two binding decisions</strong> will interrupt the game. You can\'t advance until you choose. Read the options carefully because they have lasting effects on cash, reputation, and your team.</li>
+    <li><strong>Sick leave, budget cuts, and new project arrivals</strong> will happen mid-game. You\'ll need to adapt your staffing on the fly.</li>
+    <li><strong>New projects arrive in later weeks.</strong> Some have very short windows (a 2-week project arriving in week 7, for example). You may need to free people up to chase them.</li>
+  </ul>
+</div>
+''',
+        unsafe_allow_html=True,
+    )
 
-    with ui.card("The clock"):
-        st.markdown(
-            "You have **20 minutes total** to play through all 8 weeks. The timer runs "
-            "continuously. There's no per-week limit. If time runs out, remaining weeks "
-            "auto-advance with no new staffing, which usually goes badly."
-        )
+    # The clock
+    st.markdown(
+        '''
+<div class="cap-feat" style="margin-bottom:1rem;">
+  <div class="cap-feat-eyebrow">The clock</div>
+  <p class="cap-feat-body">You have <strong>20 minutes total</strong> to play through all 8 weeks. The timer runs continuously. There\'s no per-week limit. If time runs out, remaining weeks auto-advance with no new staffing, which usually goes badly.</p>
+</div>
+''',
+        unsafe_allow_html=True,
+    )
 
     ui.info_banner(
-        "Think long. A decision in Week 2 will shape what's possible in Week 6.",
+        "Think long. A decision in Week 2 will shape what\'s possible in Week 6.",
         icon="\u2139",
     )
-    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
+    st.markdown("<div style=\'height:0.4rem\'></div>", unsafe_allow_html=True)
 
     if st.button("Begin Layer 2", type="primary", use_container_width=True):
         st.session_state.l2_started = True
