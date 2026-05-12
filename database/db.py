@@ -413,6 +413,7 @@ def save_final_score(data: dict) -> None:
         "competency_l3_self_reflection",
         "ai_flag_logical", "ai_flag_numerical", "ai_flag_verbal", "ai_flag_layer2",
         "top_fit", "recruiter_summary", "candidate_feedback",
+        "layer3_skipped", "layer3_skip_reason",
     ]
     placeholders = ",".join(["?"] * len(cols))
     with get_conn() as conn:
@@ -442,7 +443,8 @@ def get_all_completed_candidates() -> list[dict]:
                       f.competency_l3_adaptability, f.competency_l3_collaboration,
                       f.competency_l3_self_reflection,
                       f.ai_flag_logical, f.ai_flag_numerical, f.ai_flag_verbal, f.ai_flag_layer2,
-                      f.top_fit, f.recruiter_summary, f.candidate_feedback
+                      f.top_fit, f.recruiter_summary, f.candidate_feedback,
+                      f.layer3_skipped, f.layer3_skip_reason
                FROM candidates c
                JOIN final_scores f ON c.candidate_id = f.candidate_id
                WHERE c.completed_at IS NOT NULL

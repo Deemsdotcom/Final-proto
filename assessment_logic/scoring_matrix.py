@@ -53,6 +53,8 @@ def assemble_final_scores(
     candidate_feedback: str,
     recruiter_summary: str,
     ai_flags: Optional[dict] = None,
+    layer3_skipped: bool = False,
+    layer3_skip_reason: Optional[str] = None,
 ) -> dict:
     """Build the dict that goes into final_scores.
 
@@ -85,4 +87,6 @@ def assemble_final_scores(
         "top_fit": top_fit,
         "recruiter_summary": recruiter_summary,
         "candidate_feedback": candidate_feedback,
+        "layer3_skipped": 1 if layer3_skipped else 0,
+        "layer3_skip_reason": layer3_skip_reason or "",
     }

@@ -232,7 +232,41 @@ def _render_active() -> None:
         "</div>",
         unsafe_allow_html=True,
     )
-    if st.button("End call", key="l3_end_call"):
+    c_end, c_tech = st.columns([1, 1])
+    end_clicked = c_end.button("End call", key="l3_end_call")
+
+    with c_tech.expander("I'm having technical issues"):
+        st.markdown(
+            "If something isn't working - microphone, audio, the AI - tell "
+            "us what happened and we'll skip Layer 3 for you. A recruiter "
+            "will see your note and follow up."
+        )
+        with st.form("l3_tech_issue_form", clear_on_submit=False):
+            reason = st.text_area(
+                "What happened?",
+                key="l3_tech_issue_reason_input",
+                height=120,
+                placeholder=(
+                    "e.g. The microphone didn't pick up my voice, the AI "
+                    "wasn't responding to what I said, audio kept cutting out..."
+                ),
+            )
+            tech_submitted = st.form_submit_button(
+                "Submit and skip Layer 3",
+                type="primary",
+            )
+        if tech_submitted:
+            cleaned = (reason or "").strip()
+            if len(cleaned) < 5:
+                st.warning("Please describe the issue in a sentence or two.")
+            else:
+                st.session_state.l3_skip_reason = cleaned
+                release_call_mic()
+                st.session_state.l3_call_phase = "scoring"
+                st.rerun()
+                return
+
+    if end_clicked:
         st.session_state.l3_call_phase = "scoring"
         release_call_mic()
         st.rerun()
@@ -299,6 +333,18 @@ def _render_scoring() -> None:
 
     candidate_id = st.session_state.candidate_id
     questions = st.session_state.l3_main_questions or []
+
+    # Technical-issue skip path: candidate pressed "I'm having technical
+    # issues" mid-call. No transcripts to score, and we don't want to
+    # waste LLM calls. Jump straight to done; the reason is forwarded
+    # into final_scores from candidate_results._save_base_scores_fast
+    # via the l3_skip_reason session_state key.
+    if st.session_state.get("l3_skip_reason"):
+        st.session_state.l3_answer_scores = []
+        st.session_state.l3_call_phase = "done"
+        st.rerun()
+        return
+
     if not questions:
         # Defensive: if the candidate ended the call before any questions
         # loaded, jump straight to done with zero score.

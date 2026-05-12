@@ -108,6 +108,11 @@ def _save_base_scores_fast(candidate_id: str) -> None:
         "ai_flag_layer2":    int(bool(st.session_state.get("l2_ai_flag", False))),
     }
 
+    # Forward the "I have technical issues" skip from session_state if the
+    # candidate hit the escape on the Layer 3 in-call screen. The reason
+    # text is shown verbatim in the recruiter dashboard.
+    skip_reason = st.session_state.get("l3_skip_reason") or ""
+
     draft = assemble_final_scores(
         candidate_id=candidate_id,
         layer1=layer1, layer2=layer2, layer3=layer3,
@@ -115,6 +120,8 @@ def _save_base_scores_fast(candidate_id: str) -> None:
         candidate_feedback="",  # filled later by lazy LLM path
         recruiter_summary="",   # filled later by lazy LLM path
         ai_flags=ai_flags,
+        layer3_skipped=bool(skip_reason),
+        layer3_skip_reason=skip_reason,
     )
     db.save_final_score(draft)
     db.mark_complete(candidate_id)

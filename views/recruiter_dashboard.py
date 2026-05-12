@@ -227,7 +227,12 @@ def _render_deep_dive(candidate_id: str) -> None:
     cols[0].metric("Overall", f"{scores['overall_score']:.1f}")
     cols[1].metric("Layer 1", f"{scores['layer1_score']:.1f}")
     cols[2].metric("Layer 2", f"{scores['layer2_score']:.1f}")
-    cols[3].metric("Layer 3", f"{scores['layer3_score']:.1f}")
+    # Layer 3 metric carries a tech-issue badge if the candidate skipped
+    # the interview via the in-call "I'm having technical issues" escape.
+    if scores.get("layer3_skipped"):
+        cols[3].metric("Layer 3", "SKIPPED", delta="tech issues", delta_color="off")
+    else:
+        cols[3].metric("Layer 3", f"{scores['layer3_score']:.1f}")
 
     # Possible AI use chip
     flags_str = _format_ai_flags(scores)
@@ -361,8 +366,20 @@ def _render_deep_dive(candidate_id: str) -> None:
 
     # Layer 3 detail
     with st.expander("Layer 3: Interview transcripts"):
+        # Tech-issue escape: if the candidate hit "I'm having technical
+        # issues" during the call, show their reason verbatim instead of
+        # transcripts. layer3_skipped + layer3_skip_reason are stored in
+        # final_scores - the scores dict here was loaded from there.
+        if scores.get("layer3_skipped"):
+            reason = scores.get("layer3_skip_reason") or "(no reason provided)"
+            st.error(
+                "**Layer 3 skipped by candidate (technical issues)**\n\n"
+                f"Candidate's note:\n\n> {reason}\n\n"
+                "No interview transcripts were captured. The candidate's "
+                "Layer 1 and Layer 2 results are still valid."
+            )
         l3_rows = db.get_layer3_results(candidate_id)
-        if not l3_rows:
+        if not l3_rows and not scores.get("layer3_skipped"):
             st.write("No Layer 3 data.")
         bucket_names = {
             "A": "GET SPECIFIC", "B": "GET EVIDENCE",

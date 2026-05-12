@@ -83,6 +83,8 @@ CREATE TABLE IF NOT EXISTS final_scores (
     top_fit INTEGER NOT NULL,
     recruiter_summary TEXT,
     candidate_feedback TEXT,
+    layer3_skipped INTEGER NOT NULL DEFAULT 0,    -- 1 if candidate hit the "technical issues" escape on Layer 3
+    layer3_skip_reason TEXT,                       -- free-text reason the candidate typed when skipping
     FOREIGN KEY (candidate_id) REFERENCES candidates(candidate_id)
 );
 
