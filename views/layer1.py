@@ -129,10 +129,10 @@ THEME_LABELS = {
             "from one step to the next, then project that change forward."
         ),
         "tips": [
-            ("Step-by-step first.", "The change between adjacent figures is usually easier to spot than the whole pattern at once."),
-            ("Eliminate options.", "Even if you can't see the full rule, you can usually rule out 2-3 options quickly."),
-            ("Don't overthink.", "After about 30 seconds of being stuck, pick your best guess and move on."),
-            ("Watch the timer.", "The clock runs over the whole theme, not per question."),
+            ("Look at the change between adjacent figures first.",
+             " The step-by-step rule is usually easier to spot than the whole pattern at once."),
+            ("Eliminate impossible options.",
+             " Even if you can't see the full pattern, you can usually rule out 2-3 options quickly."),
         ],
     },
     "numerical": {
@@ -374,7 +374,7 @@ def _theme_intro(theme: str, theme_idx: int) -> None:
     if leftover == 0:
         time_label = f"{mins} min"
     else:
-        time_label = f"{mins} min {leftover}s"
+        time_label = f"{mins} min {leftover} sec"
 
     pills_html = (
         '<div class="cap-feat-pills">'
@@ -395,11 +395,12 @@ def _theme_intro(theme: str, theme_idx: int) -> None:
     )
 
     format_stats_html = (
-        '<div class="cap-feat-stats">'
-        f'<div class="cap-feat-stat-line"><span class="cap-feat-stat-num">{QUESTIONS_PER_THEME}</span><span class="cap-feat-stat-label">Questions</span></div>'
-        f'<div class="cap-feat-stat-line"><span class="cap-feat-stat-num">{time_label}</span><span class="cap-feat-stat-label">Theme time block</span></div>'
-        f'<div class="cap-feat-stat-line"><span class="cap-feat-stat-num">{total_seconds // QUESTIONS_PER_THEME}s</span><span class="cap-feat-stat-label">Avg per question</span></div>'
-        '</div>'
+        '<p class="cap-feat-body">'
+        f'<strong>{time_label}</strong> is given for the entire theme '
+        f'block. The clock runs continuously across all {QUESTIONS_PER_THEME} '
+        'questions; the timer does not reset between questions, so '
+        'manage your time as you go.'
+        '</p>'
     )
 
     watch_eyebrow = (
@@ -433,72 +434,18 @@ def _theme_intro(theme: str, theme_idx: int) -> None:
                 "body_html": pills_html + '<p class="cap-feat-body" style="margin-top:0.7rem;color:var(--cap-text-secondary,#A0AECB);font-size:var(--cap-text-body-sm);">' + label["look_for_note"] + '</p>',
             },
             {
-                "eyebrow": "Top strategy",
+                "eyebrow": "Tips before you start",
                 "body_html": tips_short_html,
             },
         ],
     )
 
-    # Team v9 obligatory per-theme prose. Rendered as plain markdown so
-    # the team's wording is preserved verbatim, complementing our
-    # magazine spread above (which uses chips and tips for the same
-    # ideas in a different visual register).
-    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
-    if theme == "logical":
-        st.markdown(
-            "The figures change from left to right according to a pattern: "
-            "rotation, shape changes, additions, counting, or shading. "
-            "Work out the pattern, then pick the option (A-E) that comes next."
-            "\n\n### How the patterns work\n\n"
-            "Patterns can involve any combination of:\n"
-            "- **Shape changes**: squares to triangles, open to filled, etc.\n"
-            "- **Rotation**: figures turning each step\n"
-            "- **Addition or subtraction**: elements appearing or disappearing across the sequence\n"
-            "- **Counting**: number of dots, lines, or shapes increasing or decreasing\n"
-            "- **Color or shading**: alternating, inverting, or combining\n\n"
-            "### Tips before you start\n\n"
-            "- **Look at the change between adjacent figures first.** The step-by-step rule is usually easier to spot than the whole pattern at once.\n"
-            "- **Eliminate impossible options.** Even if you can't see the full pattern, you can usually rule out 2-3 options quickly."
-        )
-    elif theme == "numerical":
-        st.markdown(
-            "Each question shows a **chart or table**, followed by a "
-            "multiple-choice question about the data. You'll need to do "
-            "arithmetic on percentages, ratios, growth rates, and similar."
-            "\n\n"
-            "Use your calculator. Read the question carefully. The wrong "
-            "answers are usually plausible-looking traps based on misreading "
-            "axes, units, or which row or column to use."
-        )
-    elif theme == "verbal":
-        st.markdown(
-            "Each question shows a **short passage** followed by a "
-            "**statement**. You'll choose one of three options:\n\n"
-            "- **True**: the statement follows logically from the passage.\n"
-            "- **False**: the statement contradicts the passage.\n"
-            "- **Cannot Say**: the passage doesn't give you enough information to decide either way.\n\n"
-            "**Important:** answer based only on what the passage says. "
-            "Don't use outside knowledge, common sense, or assumptions about "
-            "what \"should\" be true. If the passage doesn't address it "
-            "directly, the answer is almost always **Cannot Say**."
-        )
-
-    # Example question card (uses the team v9 EXAMPLE_QUESTIONS dict).
+    # Example question card (still a box - stays per user request).
     st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
     with ui.card("Example question (not graded)"):
         _render_example(theme)
 
-    # Team v9 obligatory time-budget sentence, then the
-    # auto-marked-wrong info banner.
-    st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
-    seconds_per_q = total_seconds // QUESTIONS_PER_THEME
-    st.markdown(
-        f"You have **{time_label}** total for this theme, across "
-        f"{QUESTIONS_PER_THEME} questions. That's roughly "
-        f"**{seconds_per_q} seconds per question**. Manage your time. "
-        f"The timer runs continuously; it does not reset between questions."
-    )
-
+    # Auto-marked-wrong info banner is also a boxed UI element, kept.
     st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
     ui.info_banner(
         f"Theme clock runs continuously for {time_label}. When it hits zero, any unanswered "
