@@ -87,7 +87,7 @@ EXAMPLE_QUESTIONS = {
     },
     "verbal": {
         "stem": (
-            "**Passage:** The decision must be notified in writing within "
+            "Passage: The decision must be notified in writing within "
             "fourteen days of the hearing.\n\n"
             "**Statement:** A notification given orally would not satisfy the "
             "requirement."
