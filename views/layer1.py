@@ -766,10 +766,11 @@ def _finish_layer(candidate_id: str) -> None:
     ui.inject_global_styles()
     ui.header(meta=f"Candidate {st.session_state.candidate_name}")
 
+    # Team v9 verbatim title.
     ui.eyebrow("Stage 1 of 3 complete")
     ui.page_title(
-        "Cognitive assessment complete",
-        "Your full results will be shown after you finish all three layers.",
+        "Layer 1 Complete",
+        "Nice work, you've finished the cognitive assessment. Your full results will be shown after you complete all three layers.",
     )
 
     with ui.card("Up next"):

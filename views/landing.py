@@ -20,11 +20,11 @@ def render() -> None:
     ui.header()
 
     # ── Hero ──────────────────────────────────────────────────────────────
-    ui.eyebrow("Consulting Recruitment · Capgemini Invent")
+    # Team v9 verbatim title and caption.
+    ui.eyebrow("Welcome")
     ui.page_title(
-        "A focused, modern hiring experience.",
-        "Cognitive reasoning, a firm-management simulation, and an AI-led interview - "
-        "completed in one session.",
+        "Capgemini Invent Consulting Assessment",
+        "Cognitive reasoning, staffing simulation, and voice-led interview in one session.",
     )
 
     # ── KPI stat bar ──────────────────────────────────────────────────────
@@ -61,9 +61,9 @@ def render() -> None:
                 st.rerun()
 
     with col2:
-        with ui.card("For Recruiters"):
+        with ui.card("Recruiter Login"):
             st.markdown(
-                "<p>Review completed assessments and export results.</p>",
+                "<p>Access the dashboard to review completed assessments.</p>",
                 unsafe_allow_html=True,
             )
             if st.button(
