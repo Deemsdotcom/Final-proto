@@ -73,14 +73,40 @@ def render() -> None:
 
 
 def _intro() -> None:
-    """Layer 2 intro - redesigned with our card system.
+    """Layer 2 intro - design-system version (matches Layer 1 overview).
 
-    Every sentence, bullet, and bold marker is byte-for-byte identical
-    to the previous single-st.markdown version. Only the visual
-    container changes: each section heading becomes a ui.card title,
-    and 'How you're judged' uses a 2-column split so Outcomes (70%)
-    and Process (30%) sit side by side instead of stacked.
+    Every sentence, bullet, bold marker, percentage, currency symbol and
+    emoji is byte-for-byte identical to the team's original copy. Only
+    the visual envelope changes:
+      * cards with eyebrow titles (same pattern as Layer 1 overview)
+      * numbered-rule style for 'What to prioritize' + 'What to look
+        out for' (mirrors the 'Before you begin' prep card on Layer 1)
+      * 2-column split inside 'How you're judged' so Outcomes (70%) and
+        Process (30%) sit side by side
+      * closing tip rendered as an ui.info_banner above the CTA, the
+        same cyan-accented note pattern used on every other page
     """
+    import re as _re
+
+    def _md_bold_to_html(text: str) -> str:
+        """Render **bold** as <strong>bold</strong> for use inside our
+        raw-HTML numbered rules (the ui.numbered_rule helper escapes
+        its text param so bold markdown would survive as literal **).
+        """
+        return _re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+
+    def _rule(num: int, raw_text: str, sev: str = "info") -> None:
+        sev_class = {"info": "sev-info", "warn": "sev-warn", "crit": "sev-crit"}.get(
+            sev, "sev-info"
+        )
+        st.markdown(
+            f'<div class="cap-rule {sev_class}">'
+            f'<span class="num">{num}</span>'
+            f'<span class="text">{_md_bold_to_html(raw_text)}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
     ui.inject_global_styles()
     ui.header(meta=f"Candidate {st.session_state.candidate_name}")
 
@@ -89,7 +115,7 @@ def _intro() -> None:
     with ui.card("The setup"):
         st.markdown(
             "You're the resource lead at a consulting firm with **6 consultants** and a starting "
-            "cash balance of **€500,000**. Over the next **8 simulated weeks**, you'll decide "
+            "cash balance of **\u20ac500,000**. Over the next **8 simulated weeks**, you'll decide "
             "who works on which project, respond to events, and try to keep the firm in good "
             "shape, both financially and reputationally."
         )
@@ -125,31 +151,38 @@ def _intro() -> None:
             )
 
     with ui.card("What to prioritize"):
-        st.markdown(
-            "- **Match skills and seniority before anything else.** A skill mismatch "
+        _rule(1,
+            "**Match skills and seniority before anything else.** A skill mismatch "
             "cuts that project's quality to 55%. A seniority mismatch cuts it to 65%. "
-            "These stack. A badly-staffed project pays a fraction of its revenue.\n"
-            "- **Use the smallest viable team.** Adding more people doesn't speed projects "
+            "These stack. A badly-staffed project pays a fraction of its revenue.")
+        _rule(2,
+            "**Use the smallest viable team.** Adding more people doesn't speed projects "
             "up or improve quality past 100%. Extra bodies just leave other projects "
-            "unstaffed.\n"
-            "- **Don't let projects sit idle.** Two consecutive unstaffed weeks "
-            "and the project gets cancelled with a -15 reputation hit.\n"
-            "- **Watch deadlines.** Missing one costs -8 reputation and the project pays nothing.\n"
-            "- **Plan around fatigue.** A consultant staffed every week hits high fatigue "
-            "(≥70) and starts dragging quality down. Rotate the bench."
-        )
+            "unstaffed.")
+        _rule(3,
+            "**Don't let projects sit idle.** Two consecutive unstaffed weeks "
+            "and the project gets cancelled with a -15 reputation hit.")
+        _rule(4,
+            "**Watch deadlines.** Missing one costs -8 reputation and the project pays nothing.")
+        _rule(5,
+            "**Plan around fatigue.** A consultant staffed every week hits high fatigue "
+            "(\u226570) and starts dragging quality down. Rotate the bench.")
 
     with ui.card("What to look out for"):
-        st.markdown(
-            "- **Two binding decisions** will interrupt the game. You can't advance until "
+        _rule(1,
+            "**Two binding decisions** will interrupt the game. You can't advance until "
             "you choose. Read the options carefully because they have lasting effects on "
-            "cash, reputation, and your team.\n"
-            "- **Sick leave, budget cuts, and new project arrivals** will happen mid-game. "
-            "You'll need to adapt your staffing on the fly.\n"
-            "- **New projects arrive in later weeks.** Some have very short windows "
+            "cash, reputation, and your team.",
+            sev="warn")
+        _rule(2,
+            "**Sick leave, budget cuts, and new project arrivals** will happen mid-game. "
+            "You'll need to adapt your staffing on the fly.",
+            sev="warn")
+        _rule(3,
+            "**New projects arrive in later weeks.** Some have very short windows "
             "(a 2-week project arriving in week 7, for example). You may need to "
-            "free people up to chase them."
-        )
+            "free people up to chase them.",
+            sev="warn")
 
     with ui.card("The clock"):
         st.markdown(
@@ -157,9 +190,12 @@ def _intro() -> None:
             "continuously. There's no per-week limit. If time runs out, remaining weeks "
             "auto-advance with no new staffing, which usually goes badly."
         )
-        st.markdown(
-            "Think long. A decision in Week 2 will shape what's possible in Week 6."
-        )
+
+    ui.info_banner(
+        "Think long. A decision in Week 2 will shape what's possible in Week 6.",
+        icon="\u2139",
+    )
+    st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
 
     if st.button("Begin Layer 2", type="primary", use_container_width=True):
         st.session_state.l2_started = True
