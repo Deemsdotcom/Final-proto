@@ -30,10 +30,34 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 import pandas as pd
+import re as _re
 
 # ---------------------------------------------------------------------------
 # theme configuration
 # ---------------------------------------------------------------------------
+
+
+_MD_BOLD_RE = _re.compile(r"\*\*(.+?)\*\*", _re.DOTALL)
+_MD_ITALIC_RE = _re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", _re.DOTALL)
+
+
+def _strip_md_emphasis(text: str) -> str:
+    """Remove **bold** and *italic* markdown markers from a string.
+
+    Question text comes from authored Excel cells where reviewers
+    sometimes write **Passage:** or **Statement:** intending the
+    label to be bold. Our renderer (ui.question_stem) HTML-escapes
+    the text, so those markers ended up shown literally on screen.
+    Strip them on load instead of trying to render markdown - the
+    candidate sees clean labels like 'Passage:' / 'Statement:'.
+    """
+    if not text:
+        return text
+    text = _MD_BOLD_RE.sub(r"\1", text)
+    text = _MD_ITALIC_RE.sub(r"\1", text)
+    return text
+
+
 THEMES: List[str] = ["logical", "numerical", "verbal"]
 
 # Each theme draws from one or more question pools. The runner samples
@@ -219,7 +243,7 @@ def select_questions(candidate_id: str, theme: str) -> List[Question]:
 
         out.append(Question(
             question_id=str(row["question_id"]),
-            question_text=str(row["question_text"]),
+            question_text=_strip_md_emphasis(str(row["question_text"])),
             options=shuffled,
             correct_option=new_correct_letter,
             chart_path=_row_image(row, "image_file"),
