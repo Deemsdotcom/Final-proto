@@ -274,13 +274,18 @@ def _render_project_card(p, ps, total: int) -> None:
         f"Deadline: Week {p.get('deadline_week', total)}"
     )
 
-    bar_html = ""
-    if ps["status"] == "active" and duration > 0:
+    # Always render a progress bar at the bottom so project mini-cards
+    # match the height of the consultant cards (which always show a
+    # fatigue bar). For 'Not started' projects the fill is 0% and only
+    # the dark track is visible; for active projects the cyan fill grows
+    # with weeks_staffed_correctly / duration_weeks.
+    pct = 0
+    if duration > 0:
         pct = max(0, min(100, int(progress / duration * 100)))
-        bar_html = (
-            f'<div class="l2-mini-bar"><div class="l2-mini-bar-fill" '
-            f'style="width:{pct}%;background:#1DB8F2;"></div></div>'
-        )
+    bar_html = (
+        f'<div class="l2-mini-bar"><div class="l2-mini-bar-fill" '
+        f'style="width:{pct}%;background:#1DB8F2;"></div></div>'
+    )
 
     st.markdown(
         f'<div class="l2-mini">'
