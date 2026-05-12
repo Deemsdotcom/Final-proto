@@ -33,7 +33,7 @@ def render() -> None:
     with k1:
         ui.metric("3", "Assessment Layers")
     with k2:
-        ui.metric("~60 min", "Total Duration")
+        ui.metric("~70 min", "Total Duration")
     with k3:
         ui.metric("AI", "Powered Interview")
     with k4:

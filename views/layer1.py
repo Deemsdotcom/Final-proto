@@ -406,7 +406,7 @@ def _theme_intro(theme: str, theme_idx: int) -> None:
 
     ui.theme_spread(
         eyebrow=f"Theme {theme_idx + 1} of 3",
-        title=label["title"],
+        title=f"Layer 1: {label['title']}",
         subtitle=label["subtitle"],
         side_num=f"0{theme_idx + 1}",
         side_eyebrow=f"Theme {theme_idx + 1} of 3",

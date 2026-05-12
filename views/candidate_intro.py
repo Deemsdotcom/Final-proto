@@ -14,7 +14,7 @@ from .state import advance_stage
 JOURNEY = [
     {
         "num": "1",
-        "meta": "~35 min",
+        "meta": "Layer 1 · ~35 minutes",
         "title": "Cognitive Assessment",
         "desc": (
             "30 timed reasoning questions across logical, numerical, "
@@ -23,7 +23,7 @@ JOURNEY = [
     },
     {
         "num": "2",
-        "meta": "~20 min",
+        "meta": "Layer 2 · ~20 minutes",
         "title": "Staffing Simulation",
         "desc": (
             "An 8-week firm simulation where you act as a resource manager "
@@ -32,7 +32,7 @@ JOURNEY = [
     },
     {
         "num": "3",
-        "meta": "~16 min",
+        "meta": "Layer 3 · ~16 minutes",
         "title": "AI-Led Interview",
         "desc": (
             "Four voice-recorded questions with a live follow-up for each."
