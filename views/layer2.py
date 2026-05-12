@@ -419,10 +419,45 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
             st.session_state[assignments_key] = carried
 
         assignments = st.session_state[assignments_key]
+
+        # Pre-compute what's currently selected in each project's
+        # multiselect. Streamlit's widget state for prior renders is
+        # the source of truth; on the very first render of a week
+        # (widget keys not in session_state yet) we fall back to the
+        # carried-forward defaults so previously-assigned consultants
+        # don't briefly reappear in other projects' lists.
+        def _selected_for(pid_):
+            widget_key = f"l2_assign_w{week}_{pid_}"
+            if widget_key in st.session_state:
+                vals = st.session_state[widget_key] or []
+            else:
+                vals = assignments.get(pid_, []) or []
+            return [cid for cid in vals if cid in consultant_label]
+
+        per_project_selected = {
+            project["id"]: set(_selected_for(project["id"]))
+            for project in visible_projects
+        }
+
         new_assignments = {}
         for project in visible_projects:
             pid = project["id"]
-            current = [cid for cid in assignments.get(pid, []) if cid in consultant_label]
+            current = sorted(per_project_selected[pid], key=lambda c: list(consultant_label.keys()).index(c))
+
+            # Consultants chosen in OTHER projects this week. They're
+            # hidden from this project's dropdown so the same person
+            # can't be picked for two projects at once (the game rule
+            # 'at most one project per week' is now enforced in the UI,
+            # not just in scoring).
+            taken_by_others = set()
+            for other_pid, sel in per_project_selected.items():
+                if other_pid != pid:
+                    taken_by_others |= sel
+            available_options = [
+                cid for cid in consultant_label.keys()
+                if cid not in taken_by_others
+            ]
+
             # Styled label row above the multiselect. The same label text
             # is still passed into st.multiselect for accessibility, just
             # collapsed visually so we don't show it twice.
@@ -435,13 +470,16 @@ def _render_week(scenario: dict, state: dict, remaining: int, elapsed: float) ->
             )
             chosen = st.multiselect(
                 f"**{project['name']}** ({pid})",
-                options=list(consultant_label.keys()),
+                options=available_options,
                 default=current,
                 format_func=lambda cid: consultant_label[cid],
                 key=f"l2_assign_w{week}_{pid}",
                 label_visibility="collapsed",
             )
             new_assignments[pid] = chosen
+            # Update the running tracker so the NEXT project's filter
+            # sees this project's new selection in the same render pass.
+            per_project_selected[pid] = set(chosen)
         st.session_state[assignments_key] = new_assignments
 
         # Validation warnings (live, doesn't block)
