@@ -28,16 +28,21 @@ def render() -> None:
     )
 
     # ── KPI stat bar ──────────────────────────────────────────────────────
+    # CSS grid (not st.columns) so the three tiles stay on one line at
+    # all viewport widths.
     st.markdown("<div style='height:1.5rem'></div>", unsafe_allow_html=True)
-    k1, k2, k3, k4 = st.columns(4, gap="small")
-    with k1:
-        ui.metric("3", "Assessment Layers")
-    with k2:
-        ui.metric("~70 min", "Total Duration")
-    with k3:
-        ui.metric("AI", "Powered Interview")
-    with k4:
-        ui.metric("Live", "Results Dashboard")
+    st.markdown(
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);'
+        'gap:0.6rem;margin:0.2rem 0 0.4rem 0;">'
+        '<div class="cap-metric"><span class="val">3</span>'
+        '<span class="lbl">Assessment Layers</span></div>'
+        '<div class="cap-metric"><span class="val">~70 min</span>'
+        '<span class="lbl">Total Duration</span></div>'
+        '<div class="cap-metric"><span class="val">AI</span>'
+        '<span class="lbl">Powered Interview</span></div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
     st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
 
