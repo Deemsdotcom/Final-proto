@@ -400,6 +400,23 @@ def count_layer3_typed_fallback(candidate_id: str) -> int:
         return row["c"]
 
 
+def count_layer3_scripted(candidate_id: str) -> int:
+    """How many L3 competencies the LLM judged as scripted (0-4).
+
+    Each layer3_results row carries a scripted_flag (0/1) set by the
+    scoring LLM when the answer looked rehearsed / AI-written. The
+    recruiter dashboard uses this count to decide whether Layer 3
+    contributes a signal to the tiered AI-risk classification.
+    """
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM layer3_results "
+            "WHERE candidate_id = ? AND scripted_flag = 1",
+            (candidate_id,),
+        ).fetchone()
+        return row["c"]
+
+
 # ----- Final scores -----
 
 def save_final_score(data: dict) -> None:

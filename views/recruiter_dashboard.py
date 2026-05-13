@@ -25,15 +25,27 @@ FILTER_KEYS = [
 ]
 
 
+# Layer 3 contributes a signal when at least this many of its four
+# competencies were judged "scripted" (rehearsed / AI-written) by the
+# scoring LLM. Below the threshold the L3 scripted hint is left to the
+# per-competency 🚩 tag in the transcript expander and does NOT bump the
+# overall tier.
+L3_SCRIPTED_SIGNAL_THRESHOLD = 2
+
+
 def _compute_ai_risk(row: dict) -> dict:
     """Count AI risk signals and classify the overall tier.
 
-    Five signal sources are watched:
+    Six signal sources are watched:
       - L1 logical theme flag (fast + accurate)
       - L1 numerical theme flag (fast + accurate)
       - L1 verbal theme flag (fast + accurate)
       - L2 simulation flag (fast + accurate)
       - L3 tech-issue skip (candidate flagged a tech issue mid-call)
+      - L3 scripted answers (≥ L3_SCRIPTED_SIGNAL_THRESHOLD of 4
+        competencies judged scripted by the scoring LLM). The Layer 3
+        scripted hint contributes AT MOST one signal regardless of how
+        many competencies trip it - per group decision.
 
     Tier rules:
       - 0 signals → tier "none"
@@ -50,8 +62,15 @@ def _compute_ai_risk(row: dict) -> dict:
         l1_themes.append("verbal")
     l2_flag = bool(int(row.get("ai_flag_layer2") or 0))
     l3_skip = bool(int(row.get("layer3_skipped") or 0))
+    l3_scripted_count = int(row.get("l3_scripted_count") or 0)
+    l3_scripted_flag = l3_scripted_count >= L3_SCRIPTED_SIGNAL_THRESHOLD
 
-    count = len(l1_themes) + (1 if l2_flag else 0) + (1 if l3_skip else 0)
+    count = (
+        len(l1_themes)
+        + (1 if l2_flag else 0)
+        + (1 if l3_skip else 0)
+        + (1 if l3_scripted_flag else 0)
+    )
 
     if count >= 3:
         tier = "definite"
@@ -74,6 +93,8 @@ def _compute_ai_risk(row: dict) -> dict:
         parts.append("L2")
     if l3_skip:
         parts.append("L3 tech-issue skip")
+    if l3_scripted_flag:
+        parts.append(f"L3 scripted ({l3_scripted_count}/4)")
     breakdown = ", ".join(parts)
 
     return {
@@ -81,6 +102,7 @@ def _compute_ai_risk(row: dict) -> dict:
         "tier": tier,
         "label": label,
         "breakdown": breakdown,
+        "l3_scripted_count": l3_scripted_count,
     }
 
 
@@ -201,6 +223,12 @@ def render() -> None:
             typed_fallback_cell = f"🛠 {typed_fallback_count}/4"
         else:
             typed_fallback_cell = "-"
+
+        # AI-risk cell. Fold the L3 scripted count into the row dict so
+        # _compute_ai_risk can include it as a signal.
+        risk_row = row.to_dict()
+        risk_row["l3_scripted_count"] = db.count_layer3_scripted(row["candidate_id"])
+
         table_rows.append({
             "Name": row["full_name"],
             "Email": row["email"],
@@ -209,7 +237,7 @@ def render() -> None:
             "Layer 2": round(float(row["layer2_score"] or 0), 1),
             "Layer 3": round(float(row["layer3_score"] or 0), 1),
             "Overall": round(float(row["overall_score"] or 0), 1),
-            "Possible AI use": _format_ai_flags(row.to_dict()),
+            "Possible AI use": _format_ai_flags(risk_row),
             "L3 typed fallback": typed_fallback_cell,
             "Top Fit": "✓" if row["top_fit"] == 1 else "-",
         })
@@ -286,8 +314,10 @@ def _render_deep_dive(candidate_id: str) -> None:
 
     # AI-risk banner. Tiered by signal count (see _compute_ai_risk):
     # 1 signal renders an amber "Possible" note, 2 an amber "Probable",
-    # 3+ a red "Definite". The L3 tech-issue skip is counted as a
-    # signal alongside the four classic AI flags.
+    # 3+ a red "Definite". The L3 tech-issue skip and the L3 scripted
+    # count are folded into the signal pool alongside the four classic
+    # AI flags.
+    scores["l3_scripted_count"] = db.count_layer3_scripted(scores["candidate_id"])
     risk = _compute_ai_risk(scores)
     if risk["tier"] == "definite":
         st.error(
