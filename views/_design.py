@@ -183,9 +183,9 @@ _GLOBAL_CSS = f"""
 /* ── Full-bleed header bar ─────────────────────────────────────────────── */
 .cap-header {{
     display: flex;
-    align-items: center;
+    align-items: flex-end;
     justify-content: space-between;
-    padding: 1.35rem {_PAD};
+    padding: 1.6rem {_PAD} 0.45rem {_PAD};
     margin-left: -{_PAD};
     margin-right: -{_PAD};
     margin-bottom: 3rem;
@@ -202,11 +202,11 @@ _GLOBAL_CSS = f"""
     height: 72px;
     width: auto;
     display: block;
-    /* Optical alignment - the wordmark baseline sits slightly above
-       the bounding box centre, so a tiny upward nudge centres it
-       visually next to the right-side meta label. */
-    margin-top: -2px;
-    margin-bottom: -2px;
+    /* Push the logo leftward past the natural page-edge padding and
+       let it sit a touch below the visual baseline so it hugs the
+       bottom border of the header. */
+    margin-left: -1.1rem;
+    margin-bottom: -4px;
 }}
 .cap-logo-wrap {{
     display: inline-flex;
