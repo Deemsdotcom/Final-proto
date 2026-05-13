@@ -77,7 +77,7 @@ _PAD = "3.5rem"
 _GLOBAL_CSS = f"""
 <style>
 /* Ubuntu from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&family=Comfortaa:wght@600;700&family=Yellowtail&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700&family=Comfortaa:wght@600;700&display=swap');
 
 /* ── Base ──────────────────────────────────────────────────────────────── */
 .stApp {{
@@ -187,15 +187,19 @@ _GLOBAL_CSS = f"""
     line-height: 1;
 }}
 .cap-invent-word {{
-    /* Script wordmark to match the Capgemini Invent brand. Yellowtail
-       is the closest free Google Font to the brand's custom script. */
-    font-family: 'Yellowtail', 'Ubuntu', cursive;
-    font-size: 2.05rem;
-    font-weight: 400;
+    /* "invent" wordmark next to the Capgemini SVG. The brand uses a
+       custom italic typeface; Ubuntu Italic is the closest match in
+       the fonts already loaded by this page. */
+    font-family: 'Ubuntu', 'Segoe UI', sans-serif;
+    font-style: italic;
+    font-size: 1.65rem;
+    font-weight: 500;
     color: #0070ad;
     line-height: 1;
-    letter-spacing: -0.5px;
-    margin-bottom: -2px;  /* nudge baseline to align with Capgemini wordmark */
+    letter-spacing: -0.01em;
+    /* Baseline tweak so 'invent' sits visually centred with
+       the Capgemini wordmark next to it. */
+    transform: translateY(1px);
 }}
 
 /* ── KPI metric cards ──────────────────────────────────────────────────── */
