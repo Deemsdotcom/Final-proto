@@ -385,6 +385,24 @@ def count_layer3_answered(candidate_id: str) -> int:
         return row["c"]
 
 
+def count_layer3_main_answers(candidate_id: str) -> int:
+    """How many L3 competencies have a non-empty main_transcript (0..4).
+
+    Used by the recruiter dashboard + candidate results page to
+    distinguish a full skip (0 answered → "SKIPPED") from a partial
+    one (1-3 answered → score + "partly skipped (N unanswered)").
+    """
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM layer3_results "
+            "WHERE candidate_id = ? "
+            "AND main_transcript IS NOT NULL "
+            "AND TRIM(main_transcript) != ''",
+            (candidate_id,),
+        ).fetchone()
+        return row["c"]
+
+
 def count_layer3_typed_fallback(candidate_id: str) -> int:
     """How many L3 competencies the candidate completed using the typed-fallback escape.
 

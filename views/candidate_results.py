@@ -209,20 +209,49 @@ def _render_candidate_view(scores: dict) -> None:
     ui.page_title("Your assessment results", subtitle)
 
     # ── Score metrics ────────────────────────────────────────────────
+    # Layer 3 display:
+    #   • full skip (0 of 4 answered) → SKIPPED + "tech issues"
+    #   • partial skip (1-3 of 4 answered) → score + "partly skipped (N)"
+    #   • no skip flag → score as normal
     skipped = bool(scores.get("layer3_skipped"))
+    l3_answered = db.count_layer3_main_answers(scores["candidate_id"]) if skipped else 4
+    l3_unanswered = 4 - l3_answered
+    partial_skip = skipped and l3_answered > 0
+    full_skip = skipped and l3_answered == 0
+
     cols = st.columns(4)
     cols[0].metric("Overall", f"{(scores.get('overall_score') or 0):.0f}")
     cols[1].metric("Layer 1 (Cognitive)", f"{(scores.get('layer1_score') or 0):.0f}")
     cols[2].metric("Layer 2 (Simulation)", f"{(scores.get('layer2_score') or 0):.0f}")
-    if skipped:
-        cols[3].metric("Layer 3 (Interview)", "SKIPPED", delta="tech issues", delta_color="off")
+    if full_skip:
+        cols[3].metric(
+            "Layer 3 (Interview)", "SKIPPED",
+            delta="tech issues", delta_color="off",
+        )
+    elif partial_skip:
+        cols[3].metric(
+            "Layer 3 (Interview)", f"{(scores.get('layer3_score') or 0):.0f}",
+            delta=f"partly skipped ({l3_unanswered} unanswered)",
+            delta_color="off",
+        )
     else:
-        cols[3].metric("Layer 3 (Interview)", f"{(scores.get('layer3_score') or 0):.0f}")
+        cols[3].metric(
+            "Layer 3 (Interview)",
+            f"{(scores.get('layer3_score') or 0):.0f}",
+        )
 
-    if skipped:
+    if full_skip:
         ui.info_banner(
             "Layer 3 was skipped at your request due to technical issues. "
             "A member of the recruitment team will follow up.",
+            icon="i",
+        )
+    elif partial_skip:
+        ui.info_banner(
+            f"Layer 3 was partly skipped at your request due to "
+            f"technical issues. {l3_answered} of 4 competencies were "
+            f"completed; the remaining {l3_unanswered} were not "
+            f"answered and counted as 0.",
             icon="i",
         )
 

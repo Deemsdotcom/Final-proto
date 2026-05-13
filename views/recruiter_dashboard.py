@@ -307,8 +307,24 @@ def _render_deep_dive(candidate_id: str) -> None:
     cols[2].metric("Layer 2", f"{scores['layer2_score']:.1f}")
     # Layer 3 metric carries a tech-issue badge if the candidate skipped
     # the interview via the in-call "I'm having technical issues" escape.
+    # Layer 3 display:
+    #   • full skip (0 of 4 answered) → SKIPPED + "tech issues"
+    #   • partial skip (1-3 of 4 answered) → score + "partly skipped (N)"
+    #   • no skip flag → score as normal
     if scores.get("layer3_skipped"):
-        cols[3].metric("Layer 3", "SKIPPED", delta="tech issues", delta_color="off")
+        l3_answered = db.count_layer3_main_answers(scores["candidate_id"])
+        unanswered = 4 - l3_answered
+        if l3_answered == 0:
+            cols[3].metric(
+                "Layer 3", "SKIPPED",
+                delta="tech issues", delta_color="off",
+            )
+        else:
+            cols[3].metric(
+                "Layer 3", f"{scores['layer3_score']:.1f}",
+                delta=f"partly skipped ({unanswered} unanswered)",
+                delta_color="off",
+            )
     else:
         cols[3].metric("Layer 3", f"{scores['layer3_score']:.1f}")
 
