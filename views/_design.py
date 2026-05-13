@@ -199,7 +199,7 @@ _GLOBAL_CSS = f"""
     letter-spacing: 0.03em;
 }}
 .cap-logo-img {{
-    height: 38px;
+    height: 56px;
     width: auto;
     display: block;
 }}
