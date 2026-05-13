@@ -31,7 +31,6 @@ from __future__ import annotations
 import time
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from assessment_logic.layer3_logic import (
     COMPETENCY_COUNT,
@@ -366,22 +365,6 @@ def _render_closing() -> None:
 
 
 def _render_scoring() -> None:
-    # Defensive: if the candidate hit "Submit and skip" mid-AI-sentence,
-    # the speechSynthesis queue on the now-destroyed voice_turn iframe
-    # can keep playing in some browsers. Render a tiny invisible script
-    # on this fresh page that cancels speech on parent + own window, so
-    # any leftover utterance is killed the instant the scoring page
-    # mounts.
-    components.html(
-        "<script>"
-        "(function(){"
-        "try{var ss=(window.parent&&window.parent.speechSynthesis)||window.speechSynthesis;if(ss)ss.cancel();}catch(e){}"
-        "try{if('speechSynthesis' in window)window.speechSynthesis.cancel();}catch(e){}"
-        "})();"
-        "</script>",
-        height=0,
-    )
-
     ui.eyebrow("Finalising")
     ui.page_title("Scoring your interview", subtitle="One moment - we are reviewing each competency against the rubric.")
 

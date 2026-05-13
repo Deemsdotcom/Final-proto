@@ -153,19 +153,6 @@ def _render_drive_script(
         return;
       }}
 
-      // Speech synthesis: route through window.parent.speechSynthesis
-      // instead of this iframe's own. Each frame has its OWN queue, and
-      // Streamlit destroys this iframe on rerun - the in-flight speech
-      // queued here would survive iframe destruction (or be impossible
-      // to reach from another iframe like release_call_mic), which is
-      // exactly the "AI keeps talking after Submit and skip" bug.
-      // Routing through the parent makes one shared queue that any
-      // iframe can cancel via window.parent.speechSynthesis.cancel().
-      const SS = (function() {{
-        try {{ return window.parent.speechSynthesis || window.speechSynthesis; }}
-        catch (e) {{ return window.speechSynthesis; }}
-      }})();
-
       function setStatus(msg) {{ if (statusEl) statusEl.textContent = msg; }}
 
       function findRecorderButton() {{
@@ -187,7 +174,7 @@ def _render_drive_script(
       }}
 
       function pickVoice() {{
-        const voices = SS.getVoices();
+        const voices = window.speechSynthesis.getVoices();
         if (!voices || voices.length === 0) return null;
         const preferred = [
           "Google US English",
@@ -226,7 +213,7 @@ def _render_drive_script(
           if (TURN_ID) w.__capLastTurn = TURN_ID;
         }} catch (e) {{ /* same-origin only; ignore */ }}
 
-        SS.cancel();
+        window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(TEXT);
         const v = pickVoice();
         if (v) utter.voice = v;
@@ -244,11 +231,11 @@ def _render_drive_script(
         const fireSpeak = function() {{
           if (speakFired) return;
           speakFired = true;
-          try {{ SS.speak(utter); }} catch (e) {{}}
+          try {{ window.speechSynthesis.speak(utter); }} catch (e) {{}}
         }};
 
-        if (SS.getVoices().length === 0) {{
-          SS.addEventListener(
+        if (window.speechSynthesis.getVoices().length === 0) {{
+          window.speechSynthesis.addEventListener(
             "voiceschanged",
             fireSpeak,
             {{ once: true }}
@@ -395,8 +382,7 @@ def release_call_mic() -> None:
         "w.__capMicStream=null;"
         "}"
         "w.__capLastTurn=null;"
-        "try{var ss=(window.parent&&window.parent.speechSynthesis)||window.speechSynthesis;if(ss)ss.cancel();}catch(e){}"
-        "try{if('speechSynthesis' in window)window.speechSynthesis.cancel();}catch(e){}"
+        "if(\"speechSynthesis\" in window){window.speechSynthesis.cancel();}"
         "}catch(e){}"
         "})();"
         "</script>",
