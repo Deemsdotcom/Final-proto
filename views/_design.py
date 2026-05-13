@@ -185,7 +185,7 @@ _GLOBAL_CSS = f"""
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem {_PAD};
+    padding: 1.35rem {_PAD};
     margin-left: -{_PAD};
     margin-right: -{_PAD};
     margin-bottom: 3rem;
@@ -199,9 +199,14 @@ _GLOBAL_CSS = f"""
     letter-spacing: 0.03em;
 }}
 .cap-logo-img {{
-    height: 56px;
+    height: 72px;
     width: auto;
     display: block;
+    /* Optical alignment - the wordmark baseline sits slightly above
+       the bounding box centre, so a tiny upward nudge centres it
+       visually next to the right-side meta label. */
+    margin-top: -2px;
+    margin-bottom: -2px;
 }}
 .cap-logo-wrap {{
     display: inline-flex;
