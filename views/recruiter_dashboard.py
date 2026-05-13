@@ -25,15 +25,21 @@ FILTER_KEYS = [
 ]
 
 
-def _format_ai_flags(row: dict) -> str:
-    """Build the 'Possible AI use' cell string from the four flag columns.
+def _compute_ai_risk(row: dict) -> dict:
+    """Count AI risk signals and classify the overall tier.
 
-    Empty if no flags. Otherwise lists which Layer 1 themes tripped, plus
-    whether Layer 2 tripped. Examples:
-      ""
-      "L1 verbal"
-      "L1 logical+numerical, L2"
-      "L2"
+    Five signal sources are watched:
+      - L1 logical theme flag (fast + accurate)
+      - L1 numerical theme flag (fast + accurate)
+      - L1 verbal theme flag (fast + accurate)
+      - L2 simulation flag (fast + accurate)
+      - L3 tech-issue skip (candidate flagged a tech issue mid-call)
+
+    Tier rules:
+      - 0 signals → tier "none"
+      - 1 signal → tier "single" (informational only)
+      - 2 signals → tier "probable" (amber banner)
+      - 3+ signals → tier "definite" (red banner)
     """
     l1_themes = []
     if int(row.get("ai_flag_logical") or 0):
@@ -42,12 +48,56 @@ def _format_ai_flags(row: dict) -> str:
         l1_themes.append("numerical")
     if int(row.get("ai_flag_verbal") or 0):
         l1_themes.append("verbal")
+    l2_flag = bool(int(row.get("ai_flag_layer2") or 0))
+    l3_skip = bool(int(row.get("layer3_skipped") or 0))
+
+    count = len(l1_themes) + (1 if l2_flag else 0) + (1 if l3_skip else 0)
+
+    if count >= 3:
+        tier = "definite"
+        label = "Definite AI usage"
+    elif count == 2:
+        tier = "probable"
+        label = "Probable AI usage"
+    elif count == 1:
+        tier = "single"
+        label = "Possible AI use"
+    else:
+        tier = "none"
+        label = ""
+
+    # Compact breakdown string used in the table cell and detail banner.
     parts = []
     if l1_themes:
         parts.append("L1 " + "+".join(l1_themes))
-    if int(row.get("ai_flag_layer2") or 0):
+    if l2_flag:
         parts.append("L2")
-    return ", ".join(parts) if parts else "-"
+    if l3_skip:
+        parts.append("L3 tech-issue skip")
+    breakdown = ", ".join(parts)
+
+    return {
+        "count": count,
+        "tier": tier,
+        "label": label,
+        "breakdown": breakdown,
+    }
+
+
+def _format_ai_flags(row: dict) -> str:
+    """Build the 'Possible AI use' cell string for the candidate table.
+
+    Empty (\"-\") when no signals. One signal renders the breakdown
+    only. Two signals renders \"Probable · <breakdown>\". Three or
+    more renders \"Definite · <breakdown>\". The L3 tech-issue skip
+    counts as a signal alongside the four classic AI flags.
+    """
+    risk = _compute_ai_risk(row)
+    if risk["count"] == 0:
+        return "-"
+    if risk["tier"] in ("probable", "definite"):
+        return f"{risk['label']} · {risk['breakdown']}"
+    return risk["breakdown"]
 
 
 def render() -> None:
@@ -234,10 +284,26 @@ def _render_deep_dive(candidate_id: str) -> None:
     else:
         cols[3].metric("Layer 3", f"{scores['layer3_score']:.1f}")
 
-    # Possible AI use chip
-    flags_str = _format_ai_flags(scores)
-    if flags_str and flags_str != "-":
-        st.warning(f"⚠️ Possible AI use flagged: **{flags_str}**  (informational only)")
+    # AI-risk banner. Tiered by signal count (see _compute_ai_risk):
+    # 1 signal renders an amber "Possible" note, 2 an amber "Probable",
+    # 3+ a red "Definite". The L3 tech-issue skip is counted as a
+    # signal alongside the four classic AI flags.
+    risk = _compute_ai_risk(scores)
+    if risk["tier"] == "definite":
+        st.error(
+            f"🚩 **Definite AI usage** · {risk['count']} signals tripped · "
+            f"{risk['breakdown']}"
+        )
+    elif risk["tier"] == "probable":
+        st.warning(
+            f"⚠️ **Probable AI usage** · {risk['count']} signals tripped · "
+            f"{risk['breakdown']}"
+        )
+    elif risk["tier"] == "single":
+        st.warning(
+            f"⚠️ Possible AI use flagged: **{risk['breakdown']}** "
+            f"(informational only)"
+        )
 
     # Competency radar (v7: 4 L3 axes)
     comp_labels = [
