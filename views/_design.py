@@ -69,6 +69,24 @@ _LOGO_SVG = """<!-- Created with Inkscape (http://www.inkscape.org/) by Marsupil
 </svg>
 <!-- version: 20171223, original size: 159.4487 35.556198, border: 3% -->"""
 
+
+# Capgemini Invent brand logo (transparent PNG) embedded as base64 so
+# Streamlit doesn't need a static-file route. Loaded once at module
+# import time. The PNG lives at data/branding/capgemini_invent_logo.png
+# inside the repo and is the official Invent_Logo_2COL_RGB asset.
+import base64 as _b64
+import os.path as _osp
+_LOGO_PNG_PATH = _osp.join(
+    _osp.dirname(_osp.dirname(_osp.abspath(__file__))),
+    "data", "branding", "capgemini_invent_logo.png",
+)
+try:
+    with open(_LOGO_PNG_PATH, "rb") as _f:
+        _LOGO_DATA_URI = "data:image/png;base64," + _b64.b64encode(_f.read()).decode("ascii")
+except Exception:
+    _LOGO_DATA_URI = ""
+
+
 # Horizontal padding shared by the block-container and the header bleed
 _PAD = "3.5rem"
 
@@ -179,6 +197,11 @@ _GLOBAL_CSS = f"""
     font-size: 0.83rem;
     font-weight: 500;
     letter-spacing: 0.03em;
+}}
+.cap-logo-img {{
+    height: 38px;
+    width: auto;
+    display: block;
 }}
 .cap-logo-wrap {{
     display: inline-flex;
@@ -1223,17 +1246,18 @@ def inject_global_styles() -> None:
 def header(meta: Optional[str] = None) -> None:
     """Full-bleed top bar with the Capgemini Invent logo + optional right label.
 
-    The "invent" wordmark is rendered as a Google Font (Yellowtail) span
-    next to the embedded "Capgemini" SVG. Yellowtail is the closest free
-    script to the brand's custom typeface and loads via the @import at
-    the top of _GLOBAL_CSS.
+    Renders the official Capgemini Invent PNG (loaded once into
+    _LOGO_DATA_URI at module import). If the PNG isn't available for
+    some reason, falls back to the embedded SVG wordmark.
     """
     meta_html = f'<div class="meta">{_esc(meta)}</div>' if meta else ""
-    logo_html = (
-        f'<div class="cap-logo-wrap">'
-        f'{_LOGO_SVG}<span class="cap-invent-word">invent</span>'
-        f'</div>'
-    )
+    if _LOGO_DATA_URI:
+        logo_html = (
+            f'<img class="cap-logo-img" src="{_LOGO_DATA_URI}" '
+            f'alt="Capgemini Invent" />'
+        )
+    else:
+        logo_html = _LOGO_SVG
     st.markdown(
         f'<div class="cap-header">{logo_html}{meta_html}</div>',
         unsafe_allow_html=True,
