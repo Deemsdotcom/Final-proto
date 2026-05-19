@@ -327,7 +327,7 @@ def _render_drive_script(
             // Don't auto-stop in the first 1.2s - gives the candidate
             // time to start speaking.
             if (elapsed < 1200) {{ belowSinceMs = null; return; }}
-            if (rms < 8) {{
+            if (rms < 4) {{
               if (belowSinceMs === null) belowSinceMs = now;
               const quietFor = now - belowSinceMs;
               if (quietFor >= SILENCE_MS) {{ clickStop(); return; }}
