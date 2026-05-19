@@ -343,12 +343,19 @@ def _render_drive_script(
 
       function armRecorder() {{
         if (armed) return;
-        armed = true;
+        // IMPORTANT: only mark 'armed' AFTER we've actually found and
+        // clicked the recorder button. The old code set armed=true at
+        // the very top, which meant the setTimeout retry path below
+        // hit the early-return guard and never retried - leaving the
+        // status stuck at "Recorder not found" with no recording ever
+        // starting. Now if the button isn't in the DOM yet, we leave
+        // armed=false so the retry actually runs.
         const btn = findRecorderButton();
         if (!btn) {{ setStatus("Recorder not found - retrying..."); setTimeout(armRecorder, 300); return; }}
         // Don't double-arm if the recorder is already in 'stop' state
         // for some reason (stale recording from a previous run).
-        if (isRecording(btn)) {{ startVad(); return; }}
+        if (isRecording(btn)) {{ armed = true; startVad(); return; }}
+        armed = true;
         btn.click();
         // Small delay so the click propagates to Streamlit and the mic
         // permission grant (first turn only) resolves before VAD starts.
