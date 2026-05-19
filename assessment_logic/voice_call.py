@@ -277,11 +277,27 @@ def _render_drive_script(
           cb(w.__capMicStream);
           return;
         }}
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {{
+        // IMPORTANT: route getUserMedia through the PARENT window's
+        // navigator. The parent is the Streamlit top-level page where
+        // the user granted mic permission; this iframe (rendered via
+        // components.html) does not have an allow="microphone"
+        // attribute and would be treated as a separate document by
+        // Chrome - which would re-prompt on every turn. Using the
+        // parent's navigator makes Chrome check the parent document's
+        // permission, which is already granted, so subsequent turns
+        // are silent. Falls back to the iframe's own navigator if the
+        // parent isn't reachable (e.g., cross-origin sandbox).
+        let nav = navigator;
+        try {{
+          if (w && w.navigator && w.navigator.mediaDevices && w.navigator.mediaDevices.getUserMedia) {{
+            nav = w.navigator;
+          }}
+        }} catch (e) {{ /* cross-origin parent - stay with own navigator */ }}
+        if (!nav.mediaDevices || !nav.mediaDevices.getUserMedia) {{
           setStatus("Mic API unavailable.");
           return;
         }}
-        navigator.mediaDevices.getUserMedia({{
+        nav.mediaDevices.getUserMedia({{
           audio: {{ echoCancellation: true, noiseSuppression: true, autoGainControl: true }}
         }}).then(function(stream) {{
           w.__capMicStream = stream;
