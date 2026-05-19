@@ -282,6 +282,33 @@ def _render_active() -> None:
     if should_speak_now:
         st.session_state[turn_spoken_key] = True
 
+    # ── Determine first whether this render is the "consume" pass
+    # (audio just arrived and we need to transcribe + advance). If it is,
+    # we render ONLY the status pulse and do the work - no End call /
+    # Tech issues row. Showing those buttons during the brief 2-5s
+    # transcription window caused them to flash twice as the page
+    # re-rendered.
+    is_consuming = False
+    audio_bytes = None
+    fingerprint = None
+    if audio_file is not None:
+        audio_bytes = audio_file.getvalue()
+        fingerprint = (
+            getattr(audio_file, "file_id", id(audio_file)),
+            len(audio_bytes),
+        )
+        if st.session_state.l3_consumed_fingerprint != fingerprint:
+            is_consuming = True
+
+    # Status pulse always renders (red live / amber reviewing).
+    _render_status_pulse(status_slot, is_consuming=is_consuming)
+
+    if is_consuming:
+        st.session_state.l3_consumed_fingerprint = fingerprint
+        _consume_turn_audio(comp_idx, phase, audio_bytes)
+        return
+
+    # ── Live-call UI (only when waiting for the candidate to speak).
     st.markdown(
         '<div style="margin-top:18px;font-size:0.85rem;color:#94a3b8;">'
         "If anything goes wrong, you can press End call at any time. "
@@ -328,33 +355,6 @@ def _render_active() -> None:
         release_call_mic()
         st.rerun()
         return
-
-    # Consume the recording (if any) exactly once. st.audio_input returns
-    # the same UploadedFile on every rerun until the widget is rekeyed, so
-    # we fingerprint by (file_id, size) and skip if we've seen this one.
-    # Determine whether this render is the consuming pass: audio was
-    # delivered and we haven't processed this fingerprint yet.
-    is_consuming = False
-    audio_bytes = None
-    fingerprint = None
-    if audio_file is not None:
-        audio_bytes = audio_file.getvalue()
-        fingerprint = (
-            getattr(audio_file, "file_id", id(audio_file)),
-            len(audio_bytes),
-        )
-        if st.session_state.l3_consumed_fingerprint != fingerprint:
-            is_consuming = True
-
-    # Fill the reserved status slot at the top with a pulse that matches
-    # the actual state of the call right now.
-    _render_status_pulse(status_slot, is_consuming=is_consuming)
-
-    if not is_consuming:
-        return
-
-    st.session_state.l3_consumed_fingerprint = fingerprint
-    _consume_turn_audio(comp_idx, phase, audio_bytes)
 
 
 def _render_closing() -> None:
