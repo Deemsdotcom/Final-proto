@@ -269,16 +269,8 @@ def _render_active() -> None:
         "</div>",
         unsafe_allow_html=True,
     )
-    c_end, c_retry, c_tech = st.columns([1, 1, 1])
+    c_end, c_tech = st.columns([1, 1])
     end_clicked = c_end.button("End call", key="l3_end_call")
-    retry_clicked = c_retry.button(
-        "Retry this question",
-        key="l3_retry_question",
-        help=(
-            "Mic stuck or AI not asking? Click to drop the cached "
-            "microphone stream and have the AI repeat this question."
-        ),
-    )
 
     with c_tech.expander("I'm having technical issues"):
         st.markdown(
@@ -314,18 +306,6 @@ def _render_active() -> None:
     if end_clicked:
         st.session_state.l3_call_phase = "scoring"
         release_call_mic()
-        st.rerun()
-        return
-
-    if retry_clicked:
-        # Mic / AI stuck: drop the cached MediaStream, bump the nonce
-        # so st.audio_input gets a fresh widget key, clear the
-        # "already spoken" flag so the AI re-asks this question, and
-        # rerun. We stay on the same competency + same phase
-        # (main / follow-up), so no progress is lost.
-        release_call_mic()
-        st.session_state.l3_mic_nonce += 1
-        st.session_state.pop(turn_spoken_key, None)
         st.rerun()
         return
 
