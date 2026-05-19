@@ -324,10 +324,10 @@ def _render_drive_script(
             const rms = Math.sqrt(sum / dataArray.length);
             const now = Date.now();
             const elapsed = now - recordingStartedMs;
-            // Don't auto-stop in the first 2.5s - gives the candidate
-            // plenty of time to start speaking.
-            if (elapsed < 2500) {{ belowSinceMs = null; return; }}
-            if (rms < 5) {{
+            // Don't auto-stop in the first 1.2s - gives the candidate
+            // time to start speaking.
+            if (elapsed < 1200) {{ belowSinceMs = null; return; }}
+            if (rms < 8) {{
               if (belowSinceMs === null) belowSinceMs = now;
               const quietFor = now - belowSinceMs;
               if (quietFor >= SILENCE_MS) {{ clickStop(); return; }}
