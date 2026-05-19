@@ -202,6 +202,26 @@ def _render_intro() -> None:
 
 
 def _render_active() -> None:
+    # Hide the bare st.audio_input widget. The mic button isn't useful
+    # to the candidate (hands-free flow: TTS auto-arms it, VAD auto-stops
+    # it) and the user explicitly asked for it gone. visibility-hidden
+    # with zero box preserves the DOM node so our JS can still
+    # querySelector and click the record/stop button programmatically.
+    st.markdown(
+        """
+        <style>
+        [data-testid="stAudioInput"] {
+            visibility: hidden;
+            height: 0;
+            min-height: 0;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     turn_idx = st.session_state.l3_turn_idx
 
     # End-of-call sentinel: we've collected all ten listen turns.
@@ -539,7 +559,7 @@ def _consume_turn_audio(comp_idx: int, phase: str, audio_bytes: bytes) -> None:
     # The visible spinner text + the amber status pulse together make
     # the otherwise-silent 8-15s wait feel intentional.
     try:
-        with st.spinner("Reviewing your answer..."):
+        with st.spinner("Transcribing..."):
             transcript = transcribe_audio(audio_bytes, filename="turn.wav")
     except Exception as exc:
         # Transcription failure: stash a placeholder so scoring can still run
